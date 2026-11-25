@@ -77,6 +77,12 @@ def build_dynamic_preflight(dev: McuDevice, board_key: str = "uno") -> List[Pref
         ),
     ]
 
+    if not dev.has_device_id:
+        items.append(PreflightItem(
+            "manual_no_id",
+            f"{dev.display_name} has no silicon Device ID. The programmer cannot electronically distinguish it from other no-ID PICs; verify the package marking and target selection before any erase or write.",
+        ))
+
     if pw.mode == MODE_ZIF_18:
         items.append(PreflightItem(
             "zif_18",
@@ -92,17 +98,25 @@ def build_dynamic_preflight(dev: McuDevice, board_key: str = "uno") -> List[Pref
             f"to 2-3 (routes D2 VDD to Pin 1 — wrong JP3 damages the chip!)."
         ))
     else:
-        vdd_s = ", ".join(str(p) for p in pw.vdd_pins)
-        vss_s = ", ".join(str(p) for p in pw.vss_pins)
-        pgm_s = (f", and Pin {pw.pgm_pin} (PGM) pulled to GND via 4.7 kΩ"
-                 if pw.pgm_pin else "")
-        items.append(PreflightItem(
-            "icsp_wiring",
-            f"{dev.display_name} ({pw.package}) is wired via ICSP / breadboard "
-            f"(NOT plugged into the 18-pin ZIF socket!): MCLR/VPP=Pin {pw.vpp_pin}, "
-            f"VDD=Pin {vdd_s} (+100nF), VSS=Pin {vss_s}, PGC=Pin {pw.pgc_pin} "
-            f"({bw.clk_pin}), PGD=Pin {pw.pgd_pin} ({bw.data_pin}){pgm_s}."
-        ))
+        if not pw.pinout_verified:
+            items.append(PreflightItem(
+                "datasheet_pinout",
+                f"Pin-level wiring for {dev.display_name} is not verified by this app. "
+                "Use the exact manufacturer's datasheet to identify every VDD, VSS, "
+                "MCLR/VPP, PGC, and PGD pin before connecting; do not rely on a generic diagram.",
+            ))
+        else:
+            vdd_s = ", ".join(str(p) for p in pw.vdd_pins)
+            vss_s = ", ".join(str(p) for p in pw.vss_pins)
+            pgm_s = (f", and Pin {pw.pgm_pin} (PGM) pulled to GND via 4.7 kΩ"
+                     if pw.pgm_pin else "")
+            items.append(PreflightItem(
+                "icsp_wiring",
+                f"{dev.display_name} ({pw.package}) is wired via ICSP / breadboard "
+                f"(NOT plugged into the 18-pin ZIF socket!): MCLR/VPP=Pin {pw.vpp_pin}, "
+                f"VDD=Pin {vdd_s} (+100nF), VSS=Pin {vss_s}, PGC=Pin {pw.pgc_pin} "
+                f"({bw.clk_pin}), PGD=Pin {pw.pgd_pin} ({bw.data_pin}){pgm_s}."
+            ))
 
     if dev.reserved_words > 0:
         items.append(PreflightItem(
@@ -130,12 +144,20 @@ def gate_programmer_verified(verified: bool) -> None:
 def gate_device_match(selected: McuDevice, info: DeviceInfo) -> None:
     """Hard gate: silicon must match the selected MCU before write/erase.
 
+    The raw ID is unavailable when using the legacy host CLI. In that case the
+    adapter must rely on the host's own selected-device check; this helper will
+    not fabricate an ID from the MCU database.
+
     Two modes:
       * ID-bearing chips (e.g. PIC16F84A, ID 0x0560): strict match or block.
       * No-ID chips (e.g. PIC16F84): silicon can only prove presence
         (ID = 0x0000) — we allow it when DeviceID == 0x0000 and force the
         memory map with SETDEVICE. ID 0x3FFF (all ones) is always rejected.
     """
+    if info.device_id is None:
+        raise SafetyViolation(
+            "Raw silicon ID is unavailable from the host adapter; use the upstream host's own target-match check."
+        )
     if info.device_id == 0x3FFF:
         raise SafetyViolation(
             "Device ID reads 0x3FFF (all ones): empty socket, missing 13 V VPP, "
@@ -235,7 +257,7 @@ def gate_not_blank_only(img: HexImage) -> None:
 
 
 def build_summary(selected: McuDevice, img: HexImage,
-                  info: Optional[DeviceInfo]) -> str:
+                  info: Optional[DeviceInfo] = None) -> str:
     stats = analyze_hex_for_device(img, selected)
     lines = [
         f"Target MCU:      {selected.display_name} "
@@ -253,8 +275,11 @@ def build_summary(selected: McuDevice, img: HexImage,
             f"0x{selected.program_end:04X}"
         )
     if info is not None:
-        lines.append(f"Silicon ID:      0x{info.device_id:04X}"
-                     + (f" ({info.device_name})" if info.device_name else ""))
+        if info.device_id is not None:
+            lines.append(f"Silicon ID:      0x{info.device_id:04X}"
+                         + (f" ({info.device_name})" if info.device_name else ""))
+        elif info.device_name:
+            lines.append(f"Host-reported:   {info.device_name} (raw ID unavailable)")
     lines.append("Sequence:        VERIFY ID -> ERASE -> WRITE (Flash -> EEPROM -> Config) "
                  "-> READ-BACK VERIFY -> PWROFF (0 V safe)")
     return "\n".join(lines)

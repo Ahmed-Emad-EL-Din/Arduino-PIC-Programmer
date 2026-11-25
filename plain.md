@@ -1,99 +1,109 @@
-# Windows Desktop EXE — Completion Plan
+# Windows Desktop EXE — Source, Build, and Release Checklist
 
-This checklist is the source of truth for making a complete, safe, reproducible Windows desktop release. **Do not mark work complete until its acceptance checks have actually passed.** Update the relevant checkboxes when each task ends.
+This is the execution checklist for producing a complete, safe, reproducible Windows x64 desktop package. **Mark a task `[x]` only after its stated work and checks actually pass.** A successful compile is not the same as a hardware-validated release.
 
-## Current status and scope
+## Goal and release definition
 
-- The target is a Windows 10/11 x64 desktop application that a user can download, extract/install, and launch by double-clicking, without installing Python or manually obtaining application dependencies.
-- A genuine GitHub Release asset must be attached to a published release. A tag, source archive, or temporary Actions artifact alone does not count as a downloadable release.
-- The current checkout is incomplete and cannot produce that application. Do not create or publish a placeholder executable.
-- Preserve hardware-safety behavior: no build/release step may weaken device identification, preflight confirmation, verify-after-write, error handling, or safe power-off.
+- Deliver a portable Windows 10/11 x64 package that a user can extract and launch by double-clicking `Arduino-PIC-Programmer.exe`, without installing Python or separately downloading runtime dependencies.
+- The ZIP/package must include the Qt runtime, ArdPicProg host helper, firmware images, avrdude and its configuration/dependencies/notices, user guide, and required license notices.
+- A GitHub tag, source archive, or temporary Actions artifact is **not** a published release. A real `.exe`/`.zip` must be attached to a non-draft GitHub Release and its direct URL tested signed out.
+- Keep hardware safeguards. Do not publish a fake/stub executable or claim physical validation before it has been performed.
 
-## Phase 0 — Baseline audit (completed)
+## Baseline findings (completed)
 
-- [x] Inspect tracked files, branch contents, packaging specification, README, and user guide.
-- [x] Check GitHub branches/tags/releases for a complete source tree and existing Windows assets.
-- [x] Inspect the official `Ho-Ro/ArdPicProg` repository as a possible recovery source: it contains the legacy C++ command-line host and Arduino `ProgramPic` sketch, but not the missing custom PySide desktop GUI modules.
-- [x] Confirm the `v0.1.0` GitHub Release has no downloadable assets; no Windows `.exe` is currently available.
-- [x] Confirm the checkout has no `.github/workflows`, `src/main.py`, `firmware/`, or `assets/` directory.
-- [x] Confirm the current PyInstaller spec expects missing entry-point and data files, and the GUI imports modules absent from this checkout.
-- [x] Record verification that is possible now: Python syntax compilation and MCU-database smoke checks pass; GUI tests cannot start because PySide6 and required project modules are missing.
+- [x] Inspect the starting tree, existing GUI, PyInstaller spec, README, tests, branches, tags, and releases.
+- [x] Confirm the initial checkout had no app entry point, most imported modules, firmware, runtime assets, or build workflow.
+- [x] Confirm GitHub's `v0.1.0` release has no assets and the prior `v2.0.0` asset URL was broken.
+- [x] Inspect upstream `Ho-Ro/ArdPicProg`: it contains the GPL-3.0 C++ host and ProgramPic sketch, but not this repository's custom Qt UI.
+- [x] Pin the upstream reference source to commit `420aacef1990a1d0ce348a468ff44a73dcb554e3`.
 
-## Phase 1 — Restore a complete, trusted source tree (BLOCKING)
+## Phase 1 — Restore the application source tree
 
-- [ ] Locate and restore the complete, known-good application source. Prefer a verified upstream commit or supplied project backup; do not reconstruct hardware-programming logic from guesses.
-- [ ] Restore the application entry point, `src/main.py`, and required package initializers.
-- [ ] Restore all imported application modules, including at minimum:
-  - [ ] `app` metadata/settings and persistent settings implementation.
-  - [ ] Core Intel HEX parsing, serial transport, protocol, programmer/session, board pinout, circuit drawing, and `avrdude` integration modules.
-  - [ ] GUI theme/icons, worker/task lane, and all dialogs used by the main window (preflight, firmware flash, settings, about).
-- [ ] Restore and verify firmware source and/or licensed precompiled firmware for supported Arduino boards.
-- [ ] Restore required icons, Qt resources, diagrams, and other runtime assets referenced by the UI/package.
-- [ ] Restore a dependency manifest with pinned, compatible versions (PySide6, pyserial, schemdraw, PyInstaller, and test tools as applicable).
-- [ ] Restore or establish the correct project license and include all third-party notices/licenses required for redistributed binaries and bundled tools.
-- [ ] Add/verify `.gitignore` rules for virtual environments, build output, temporary artifacts, and Python caches.
-- [ ] Acceptance: a clean checkout contains every imported module/resource; imports work in a fresh environment; no safety-critical source is silently stubbed or replaced with a dummy implementation.
+- [x] Vendor upstream ArdPicProg host C++ sources, its Windows/POSIX serial backends, upstream notice, and full GPL-3.0 text under `vendor/ArdPicProg/`.
+- [x] Restore upstream `ProgramPic.ino` and firmware README under `firmware/source/`.
+- [x] Restore `src/main.py`, `app/` metadata/settings, package initializers, and the missing core/GUI modules needed by existing imports.
+- [x] Add pinned Python runtime/build/test dependencies in `requirements.txt`.
+- [x] Add root GPL-3.0 and LGPL-3.0 license texts plus third-party notices.
+- [x] Restore the official ArdPicProg schematic/photo used by the GUI reference tab; SVG icons/diagrams are generated by source.
+- [x] Add ignore rules for generated tools, firmware, build output, environments, and Python caches.
+- [x] Add a safe Python adapter that uses the upstream host for serial operations, verifies written addresses by read-back, and does not fabricate measured chip IDs from expected database values.
+- [x] Add explicit unverified-pinout warnings instead of inventing package pin numbers, and an extra manual-identity warning for no-ID devices.
+- [ ] Review the newly authored Python modules with a clean runtime import and Windows GUI startup test; local GUI import is currently blocked by missing Linux system libraries (`libGL`, `libEGL`, `libxkbcommon`, `libdbus`).
+- [ ] Restore/validate exact pin maps for every MCU before describing every target's physical wiring as verified.
+- [ ] Acceptance: a clean checkout starts the complete desktop UI; every internal import resolves; no dummy hardware operation or unverified destructive path remains.
 
-## Phase 2 — Core behavior and hardware safety
+## Phase 2 — Core behavior and safety validation
 
-- [ ] Verify the MCU database against the supported firmware/device table: names, IDs/masks, memory regions, config words, EEPROM sizes, and calibration/reserved words.
-- [ ] Test Intel HEX parsing for valid records, checksums, EOF, extended addresses, malformed/truncated input, empty files, and address overflow.
-- [ ] Test every supported MCU's memory-map validation, HEX-fit rejection, ID match/mismatch, and no-ID behavior.
-- [ ] Test serial protocol framing, timeouts, disconnections, malformed replies, and recovery using mocked serial devices.
-- [ ] Verify programmer operation order and cancellation/error paths: identify → preflight → erase/write → read-back verify → `PWROFF` safe state.
-- [ ] Verify every exit path (success, exception, timeout, cancel, app close) attempts a safe power-off and reports failure clearly if safe state cannot be confirmed.
-- [ ] Verify unknown IDs, empty sockets, unsafe voltages, invalid HEX, and mismatched devices block destructive operations.
-- [ ] Acceptance: automated safety tests pass; no destructive operation is possible by bypassing a failed safety gate.
+- [x] Implement strict Intel HEX parsing: record lengths, checksums, EOF, supported address ranges, conflicts, and PIC word/EEPROM conversion.
+- [x] Add HEX regression tests for PIC memory round-trip, EEPROM conversion, checksum rejection, required EOF, duplicate conflicts, and unpaired bytes.
+- [x] Add mock-host tests for connect/detect adapter behavior and read-back mismatch rejection.
+- [x] Test raw-ID gate match/mismatch, blank/unavailable IDs, no-ID manual selection, and warnings for unverified package pinouts.
+- [x] Generate the schematic and verified/fallback pinout SVGs without an external drawing dependency; XML parse tests pass.
+- [ ] Verify the 25-entry MCU database against the exact upstream firmware table, including IDs/masks, memory regions, config/EEPROM sizes, and calibration words.
+- [ ] Test the HEX fit gate and device mismatch/no-ID/empty-socket cases for every device family.
+- [ ] Test protocol timeouts, serial loss, malformed replies, exit paths, and power-off using a simulator or mock serial endpoint.
+- [ ] Verify upstream host behavior for erase, calibration preservation, program, read, and verify against the specific firmware version shipped.
+- [ ] Confirm every operation/exception/cancel/close path returns the programmer to safe state. Current cancel behavior deliberately defers until the active host process can close normally; test that behavior.
+- [ ] Acceptance: all automated safety tests pass, failed identity/HEX/preflight gates block destructive commands, and post-write comparison is mandatory by default.
 
-## Phase 3 — Desktop application and automated QA
+## Phase 3 — Desktop UI and automated QA
 
-- [ ] Install the pinned dependencies in a clean virtual environment using the documented setup command.
-- [ ] Restore/expand unit and integration tests for core logic, GUI startup, menus/dialogs, settings, drag-and-drop HEX loading, logging, and worker cancellation.
-- [ ] Use fake serial ports and mocked subprocesses for automated tests; tests must not require a connected Arduino or PIC.
-- [ ] Run the full test suite in headless/offscreen mode and resolve all failures.
-- [ ] Verify startup with no serial device connected, with no settings file, and with corrupted settings; app must show actionable errors and remain usable.
-- [ ] Test supported display scaling and common Windows resolutions; check dialogs, buttons, text, and file paths are not clipped.
-- [ ] Acceptance: all automated tests pass from a clean environment; desktop GUI launches without a console window and without hardware attached.
+- [x] Create/restore the app entry point, persistent settings, dialogs, theme, icons, and worker lane required by the workbench.
+- [x] Add test coverage for HEX parsing, backend adapter results, and SVG validity.
+- [ ] Run the full GUI integration suite on a supported Windows runner; Linux GUI tests cannot currently import Qt because this environment lacks system graphics libraries.
+- [ ] Test startup without hardware, settings file, or recent files; test corrupt settings and unavailable COM ports.
+- [ ] Test file open/drag-drop/save, recent files, preflight dismissal/acceptance, settings persistence, cancellation, and clean shutdown.
+- [ ] Test the UI at common Windows DPI scales and resolutions; ensure dialogs/buttons/text remain visible.
+- [ ] Acceptance: clean Windows runner passes all automated tests; application launches with no console and without hardware connected.
 
-## Phase 4 — Reproducible Windows packaging
+## Phase 4 — Firmware and Windows packaging
 
-- [ ] Repair the PyInstaller spec so its entry point, package discovery, hidden imports, Qt plugins, firmware, icons, and data files exactly match the restored source tree.
-- [ ] Decide and document the distribution format based on real Windows testing:
-  - [ ] Preferred: a portable package with a clearly visible `Arduino-PIC-Programmer.exe` plus all required runtime files, if that is the reliable Qt/PyInstaller layout.
-  - [ ] Use a single-file executable only if firmware, `avrdude`, Qt plugins, and writable runtime data work correctly when extracted/launched from arbitrary paths.
-- [ ] Bundle a compatible `avrdude` build and required firmware for each supported board; resolve paths relative to the installed/extracted app, never the developer's checkout.
-- [ ] Ensure user settings/logs go to an appropriate writable user-data location, not inside a protected install directory or the temporary one-file extraction folder.
-- [ ] Build on a clean Windows x64 GitHub Actions runner; do not claim a Windows executable was validated based only on a Linux build.
-- [ ] Make builds reproducible from a tagged source revision and record Python/PyInstaller/dependency versions.
-- [ ] Acceptance: the produced package contains all required files, starts on a clean Windows 10/11 x64 machine with no Python installed, and reports missing hardware/COM ports gracefully.
+- [x] Repair the PyInstaller spec to point to the actual repository root and include optional runtime folders/licenses.
+- [x] Add `packaging/build_host_windows.sh` to build/smoke-test the bundled Windows ArdPicProg host helper under MSYS2.
+- [x] Add `packaging/build_firmware.ps1` to compile board-specific ProgramPic images and stage avrdude/configuration for packaging.
+- [x] Add a Windows GitHub Actions candidate-build workflow that compiles, tests, packages, checks required files, and uploads a short-lived candidate artifact.
+- [x] Build the upstream ArdPicProg POSIX host locally and confirm its CLI help starts; this is only a source smoke test, not a Windows build.
+- [ ] Run the Windows workflow and fix all compiler, Arduino CLI, PyInstaller, missing-runtime, and test failures.
+- [ ] Verify the output is a portable onedir bundle with `Arduino-PIC-Programmer.exe` at the expected path and no Python install required.
+- [ ] Verify `ardpicprog.exe`, avrdude, its config and adjacent DLLs, all firmware images, Qt plugins, docs, and notices exist in the built package.
+- [ ] Verify bootloader handling for Uno/Nano/Mega/5V Pro Mini. Leonardo/Micro flashing through this dialog is explicitly unsupported until their bootloader port-reset flow is implemented; do not claim those upload paths work.
+- [ ] Acceptance: candidate package launches on a clean Windows 10/11 x64 machine, every required input is present, and missing ports/files produce actionable errors.
 
-## Phase 5 — Windows and hardware acceptance testing
+## Phase 5 — Windows and hardware acceptance
 
-- [ ] Download the candidate package from a clean Windows test machine and verify its SHA-256 checksum.
-- [ ] Extract/install to a path containing spaces and non-ASCII characters; launch the executable by double-clicking and from a normal user account.
-- [ ] Verify first-run behavior, settings persistence, file-open/save dialogs, logs, and application shutdown.
-- [ ] Verify firmware flashing for each board variant claimed as supported, using the bundled `avrdude`; confirm helpful errors for unavailable ports and unsupported board settings.
-- [ ] Bench-test with known-good supported hardware and a current-limited supply before any destructive operation.
-- [ ] Test at minimum one supported no-ID PIC and one ID-bearing PIC; verify detection, read, erase/write/verify, and safe power-off against known test HEX files.
-- [ ] Test deliberate wrong-device, empty-socket, missing-VPP, serial-disconnect, and verify-failure cases; confirm destructive actions are blocked or safely stopped.
-- [ ] Have a second tester follow the user guide from a clean setup and record any ambiguity or mismatch.
-- [ ] Acceptance: all tested workflows and failure cases behave as documented; no unresolved high-severity safety, data-loss, or startup bugs remain.
+- [ ] Download the candidate artifact on a clean Windows system and verify its published SHA-256.
+- [ ] Extract to a path with spaces/non-ASCII characters and launch as a normal user by double-clicking the EXE.
+- [ ] Verify settings/log locations are writable and survive restart; verify the app closes without orphaned host processes.
+- [ ] Flash ProgramPic to each board variant claimed as supported, or document the required Arduino IDE procedure where GUI flashing is unsupported.
+- [ ] Bench-test with a current-limited supply and known-good programmer hardware before destructive tests.
+- [ ] Test at least PIC16F84A and PIC12F675 detection/read/erase/program/read-back verification/power-off with known HEX.
+- [ ] Test wrong target, unknown ID, no-ID target selection, empty socket, missing VPP, serial disconnect, cancel, and verify failure; confirm writes are blocked or report failure safely.
+- [ ] Have a second tester follow the guide from a clean setup and capture any mismatches.
+- [ ] Acceptance: all claimed workflows and failure cases are physically verified; no unresolved high-severity safety, data-loss, or launch issue remains.
 
-## Phase 6 — Release publication and truthful download link
+## Phase 6 — Publish the real release
 
-- [ ] Add a Windows release workflow that builds and tests on tags (for example `vX.Y.Z`) and uploads the final distributable as a release asset.
-- [ ] Ensure the workflow fails rather than publishing if tests/build/package validation fail or expected files are absent.
-- [ ] Publish the actual `.exe` or portable `.zip` asset to a non-draft GitHub Release; confirm the asset appears in the release API and downloads successfully without authentication.
-- [ ] Generate and publish SHA-256 checksums, release notes, supported OS/architecture, install/launch steps, and known limitations.
-- [ ] Update `README.md` and `docs/USER_GUIDE.md` with a direct URL to the exact uploaded asset; click-test that URL in a signed-out browser.
-- [ ] Remove any claim that the release is ready until the asset and Windows acceptance tests are complete.
-- [ ] Acceptance: a new user can download, verify, extract/install, and launch the actual application from the documented release link; no Python or separate dependency installation is required.
+- [ ] Do not publish a release until Phases 2–5 acceptance criteria pass.
+- [ ] Create a version tag from the validated source commit and run the Windows build workflow on that exact tag.
+- [ ] Attach the actual portable ZIP (and/or EXE) to a non-draft GitHub Release; include SHA-256, OS/architecture, setup steps, supported boards/targets, and limitations.
+- [ ] Verify the asset appears in GitHub Release metadata and can be downloaded without authentication.
+- [ ] Update README and user guide with the exact asset download URL; click-test it signed out and confirm the downloaded package launches.
+- [ ] Acceptance: a new user can download, verify, extract, and run the genuine application directly from the release package without installing Python or separate runtime tools.
 
-## Current blockers / do not mark complete
+## Verification run so far
 
-- [ ] Restore the missing application source, firmware, and runtime assets (Phase 1).
-- [ ] Pass automated core and GUI tests (Phases 2–3).
-- [ ] Produce and validate a Windows x64 package on Windows (Phases 4–5).
-- [ ] Publish a real release asset and test its direct download link (Phase 6).
+- `python -m compileall -q src app`: passed.
+- `PYTHONPATH=src .venv/bin/python -m pytest -q src/tests/test_ihex.py src/tests/test_programmer_adapter.py src/tests/test_svg.py src/tests/test_safety.py`: **14 passed**.
+- `bash packaging/build_host_posix.sh`: built the upstream C++ helper into ignored `tools/ardpicprog`; CLI help smoke test passed.
+- `git diff --check`: passed on the current changes.
+- PyInstaller spec path was corrected after an initial failed attempt. A Linux packaging attempt is still blocked because the sandbox Python lacks `libpython3.11.so.1.0`; this is not a Windows build result.
+- Full `pytest src/tests` collection was attempted and is blocked in this Linux image because importing PySide6 fails on missing `libGL.so.1`; focused non-GUI tests pass. Other Qt runtime libraries may also be absent. The Windows workflow is intended to provide the supported GUI runtime test.
+- No Windows candidate build has completed, no physical hardware test has been performed, and no downloadable EXE/release asset exists yet.
 
-Until those tasks are complete, the repository has **no ready-to-use Windows executable**. Keep the README honest and do not publish an empty release or placeholder binary.
+## Remaining release blockers
+
+- [ ] Successfully run and fix the Windows build/test workflow.
+- [ ] Physically validate the adapter and safety behavior with supported hardware.
+- [ ] Publish and test a real GitHub Release asset.
+
+Until every blocker above is checked, describe this as a **candidate source/build pipeline**, not a ready-to-use released EXE.

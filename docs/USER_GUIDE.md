@@ -5,6 +5,10 @@
 
 ---
 
+## Status: source/build candidate, not a validated release
+
+There is no downloadable Windows executable yet. The Windows workflow has not completed in this project, and no physical hardware validation has been performed. Treat the UI/workflow descriptions below as intended candidate behavior, not as a guarantee that programming is ready for use. Do not perform destructive programming with an unvalidated build.
+
 ## 1. Hardware you need
 
 Follow the reference circuit (official Ho-Ro schematic):
@@ -28,9 +32,9 @@ Follow the reference circuit (official Ho-Ro schematic):
 2. Pick your board (e.g. *Arduino Uno (ATmega328P)*) and the COM port
    (use **Rescan** after plugging in).
 3. Press **Flash Firmware** and confirm. Keep USB connected.
-   * If upload fails: Nano → try *Old Bootloader* variant;
-     Leonardo/Micro → press reset twice when prompted.
-4. No Windows `.exe` release or bundled `avrdude` is currently available from this repository snapshot. For a local build, obtain `avrdude` from your operating system's package manager or the [official avrdude releases](https://github.com/avrdudes/avrdude/releases), and verify the build/package setup before connecting hardware.
+   * If Nano upload fails, select the *Old Bootloader* variant.
+   * Leonardo/Micro firmware upload is not implemented in the app yet because these boards re-enumerate their bootloader COM port; use Arduino IDE for that upload flow.
+4. The source pipeline includes a Windows script that compiles supported board firmware and stages `avrdude` for packaging. This pipeline has not yet been validated on Windows and does not provide a downloadable application today.
 
 ### Step 2 — Connect & verify
 1. Home page **Step 2 → Connect** (or `Ctrl+P`).
@@ -47,30 +51,16 @@ Follow the reference circuit (official Ho-Ro schematic):
 
 Then:
 
-1. **Preflight checklist** appears once per session — tick every item
-   (VPP LED, socket, jumper, voltage).
-2. **Confirmation** shows exactly what will happen
-   (erase → write → verify → safe state). Read it, then continue.
-3. Watch the progress bar and Activity Log:
-   ```
-   Step 1/5 — verify chip identity …     Detected: PIC16F84A … identity OK
-   Step 2/5 — erase chip …
-   Step 3/5 — write program memory …
-   Step 4/5 — READ BACK & VERIFY …       ✓ verify passed
-   Step 5/5 — power off socket (safe state) …
-   ```
+1. Review the hardware preflight prompts and confirm the physical VPP supply, target orientation, wiring, and jumper independently.
+2. Confirm the operation only after checking the target marking and the HEX memory map. A green/recognized model is not proof that raw silicon ID bits were measured; the current host interface does not expose raw ID/config values to the GUI.
+3. The host output and a read-back comparison are shown when available. These paths have not yet been verified on a real programmer, so do not treat a passing software test as hardware acceptance.
 
-The dialog ends with **SUCCESS** only after verification passes.
+The app must not be considered production-ready until Windows and physical-device acceptance testing is complete.
 
 ## 4. Other operations (Programmer menu)
 
-* **Erase Only…** — bulk erase with calibration/ID preservation.
-* **Verify vs File** — read the chip and compare against the loaded HEX
-  without writing.
-* **Read Chip → Save HEX…** — backup the chip to an Intel HEX file
-  (`Ctrl+S`).
-* **Device / Programmer Info** — port, firmware version, device ID,
-  config word, identity-verification status.
+* **Erase Only…**, **Verify vs File**, and **Read Chip** are candidate UI operations. Their behavior has not yet been accepted on physical hardware; do not rely on erase/calibration-preservation guarantees before the hardware validation phase passes.
+* **Device / Programmer Info** — selected board and target, port, firmware version, package and memory sizes. The upstream ArdPicProg command-line host does not expose raw ID/config words to the GUI; it validates the selected model when each operation starts.
 
 ## 5. Menus overview
 
@@ -92,7 +82,7 @@ The dialog ends with **SUCCESS** only after verification passes.
 | “No response from the Arduino” | Wrong port / firmware missing / Serial Monitor open | Rescan ports, flash firmware, close Serial Monitor |
 | “avrdude failed — not in sync” | Wrong board variant or port | Try Nano *Old Bootloader*; press reset and retry |
 | `DEVICE failed` | Empty socket, VPP off, chip backwards | Check red VPP LED, pin-1 orientation, lever |
-| “Chip reports X but Y is selected” | Wrong MCU selected or wrong chip | The write is **blocked** — fix the selection/chip |
+| Detected model differs from selected target | Wrong target selection or ambiguous host output | Stop; recheck package marking and selection. Raw ID values are not shown by the app. |
 | Verify failed after write | Unstable VPP, bad chip, wiring | Check 13 V supply/wiring; try another chip |
 | Port busy / access denied | Another program using the port | Close MPLAB/QPICkit/Serial Monitor |
 | HEX “outside memory map” | HEX from a different MCU | Load the HEX built for your selected target |
@@ -101,7 +91,5 @@ The dialog ends with **SUCCESS** only after verification passes.
 
 * The 13 V VPP supply must never be plugged into the Arduino power jack.
 * Do not touch the ZIF/ICSP contacts while programming.
-* The app forces **safe state (PWROFF)** after every operation, on
-  errors, on cancel, and when it closes.
-* ProgramPic itself auto-power-offs after 2 s without host activity —
-  even if the PC crashes mid-operation.
+* The upstream ArdPicProg host sends `PWROFF` during normal shutdown; a force-killed process may bypass orderly shutdown. Hardware safety behavior on errors, cancellation, or power loss has not been validated here.
+* The upstream ProgramPic source documents inactivity power-off behavior, but this application has not yet passed a physical test of that safeguard.
