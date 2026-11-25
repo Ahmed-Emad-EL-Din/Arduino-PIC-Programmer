@@ -1,7 +1,7 @@
 # Arduino-PIC Programmer — Professional Desktop EXE
 
 **Direct Download (Windows x64 EXE):**
-[Click here to download Arduino-PIC-Programmer.exe](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases/download/v2.0.0/Arduino-PIC-Programmer-Windows-x64.zip) *(Extract the ZIP and run the EXE)*
+[Click here to download Arduino-PIC-Programmer.exe](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases/download/v2.0.0/Arduino-PIC-Programmer-Windows-x64.zip) *(Extract the ZIP and run the EXE — build triggered by tag v2.0.0 or manual dispatch via GitHub Actions workflow `.github/workflows/build-windows.yml`)*
 
 **Made By:** Ahmed Emad El-Din Hussein · [https://github.com/Ahmed-Emad-EL-Din](https://github.com/Ahmed-Emad-EL-Din)
 
