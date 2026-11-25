@@ -525,7 +525,7 @@ class CircuitPanel(QWidget):
         foot_parts = []
         if pic.safety_note:
             foot_parts.append(pic.safety_note)
-        if ard.board_key == "pro_mini_8":
+        if ard.board_key == "pro_mini_5v":
             foot_parts.append(ard.reset_cap_note)
         elif ard.needs_reset_cap:
             foot_parts.append(

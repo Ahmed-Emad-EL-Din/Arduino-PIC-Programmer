@@ -756,9 +756,9 @@ class MainWindow(QMainWindow):
         bw = get_board_wiring(self.board_key)
         pw = get_pic_wiring(self.target.name)
 
-        if self.board_key == "pro_mini_8":
+        if self.board_key == "pro_mini_5v":
             self.lbl_board_note.setText(
-                "⚠ 3.3V board selected — 5V PIC bulk erase requires 4.5–5.5 V VDD!"
+                "⚠ Use only the 5V / 16MHz Pro Mini. A 3.3V variant is not electrically compatible."
             )
             self.lbl_board_note.setObjectName("warn")
         elif bw.needs_reset_cap:
@@ -837,7 +837,7 @@ class MainWindow(QMainWindow):
         self._set_chip_state(
             self.chip_board,
             f"Board: {bw.board_name}",
-            "warn" if self.board_key == "pro_mini_8" else "neutral",
+            "warn" if self.board_key == "pro_mini_5v" else "neutral",
         )
         if conn:
             self._set_chip_state(
@@ -902,8 +902,8 @@ class MainWindow(QMainWindow):
         if self.lane.busy:
             self.session.request_cancel()
             self.lane.cancel()
-            self.log("Cancellation requested — powering off socket safely…", "WARN")
-            self.status_lbl.setText("Cancelling operation & powering off socket…")
+            self.log("Cancellation requested. The current serial command will finish before the host closes the port safely.", "WARN")
+            self.status_lbl.setText("Waiting for the current hardware command to finish safely…")
 
     def _ensure_preflight(self) -> bool:
         pair = (self.board_key, self.target.name)
@@ -1104,11 +1104,10 @@ class MainWindow(QMainWindow):
             self.progress.setValue(100)
             if matched is not None:
                 self.lbl_silicon_probe.setText(
-                    f"Detected silicon: {matched.display_name} (ID 0x{info.device_id:04X}, "
-                    f"Cfg 0x{info.config_word:04X})"
+                    f"ProgramPic reports: {matched.display_name} (raw ID/config not exposed by host)"
                 )
                 self.log(
-                    f"Auto-detected {matched.display_name} (DeviceID=0x{info.device_id:04X}).",
+                    f"ProgramPic host identified {matched.display_name}; destructive operations will re-check target identity.",
                     "OK",
                 )
                 idx = self.cmb_mcu.findData(matched.name)
@@ -1125,21 +1124,18 @@ class MainWindow(QMainWindow):
                         self.cmb_mcu.setCurrentIndex(idx)
                 self.status_lbl.setText(f"Detected {matched.display_name} — socket returned to 0 V")
             else:
+                label = info.device_name or "unknown"
                 self.lbl_silicon_probe.setText(
-                    f"Detected raw ID: 0x{info.device_id:04X} (no auto-ID or empty socket)"
+                    f"ProgramPic reports an unsupported target: {label}; not auto-selected"
                 )
                 self.log(
-                    f"Probe returned DeviceID=0x{info.device_id:04X} ({info.device_name or 'manual-select MCU'}).",
+                    f"ProgramPic reported unsupported target {label}; destructive operations remain blocked unless a supported target is explicitly selected and independently validated.",
                     "WARN",
                 )
-                QMessageBox.information(
+                QMessageBox.warning(
                     self,
-                    "Silicon probe result",
-                    f"Raw Device ID: 0x{info.device_id:04X}\n"
-                    f"Config Word:   0x{info.config_word:04X}\n\n"
-                    "Older chips such as PIC16F84 have no silicon Device ID and must be "
-                    "selected manually. If using a newer PIC (e.g. PIC16F84A / PIC16F628A / "
-                    "PIC16F877A), check 13 V VPP, JP3 jumper, and Pin-1 orientation.",
+                    "Unsupported or unidentified target",
+                    "The host did not return a supported PIC model. No raw device ID or config word is exposed by the upstream host command. For no-ID devices, select the exact model manually and follow its datasheet; verify wiring and VPP before any destructive action.",
                 )
 
         self._run_task(task, ok, "Auto-Detect PIC")
@@ -1376,8 +1372,15 @@ class MainWindow(QMainWindow):
                 return
             self.session.request_cancel()
             self.lane.cancel()
-            if self.lane.current is not None:
-                self.lane.current.wait(2500)
+            worker = self.lane.current
+            if worker is not None and not worker.wait(30000):
+                QMessageBox.warning(
+                    self,
+                    "Operation still running",
+                    "The hardware command has not finished. The application will stay open rather than force-stop a serial write. Wait for the operation to finish, confirm the programmer is in a safe state, then close again.",
+                )
+                ev.ignore()
+                return
 
         self.session.disconnect()
         self.settings.geometry = self.saveGeometry()

@@ -28,8 +28,8 @@ Follow the reference circuit (official Ho-Ro schematic):
 2. Pick your board (e.g. *Arduino Uno (ATmega328P)*) and the COM port
    (use **Rescan** after plugging in).
 3. Press **Flash Firmware** and confirm. Keep USB connected.
-   * If upload fails: Nano → try *Old Bootloader* variant;
-     Leonardo/Micro → press reset twice when prompted.
+   * If Nano upload fails, select the *Old Bootloader* variant.
+   * Leonardo/Micro firmware upload is not implemented in the app yet because these boards re-enumerate their bootloader COM port; use Arduino IDE for that upload flow.
 4. No Windows `.exe` release or bundled `avrdude` is currently available from this repository snapshot. For a local build, obtain `avrdude` from your operating system's package manager or the [official avrdude releases](https://github.com/avrdudes/avrdude/releases), and verify the build/package setup before connecting hardware.
 
 ### Step 2 — Connect & verify
@@ -69,8 +69,7 @@ The dialog ends with **SUCCESS** only after verification passes.
   without writing.
 * **Read Chip → Save HEX…** — backup the chip to an Intel HEX file
   (`Ctrl+S`).
-* **Device / Programmer Info** — port, firmware version, device ID,
-  config word, identity-verification status.
+* **Device / Programmer Info** — selected board and target, port, firmware version, package and memory sizes. The upstream ArdPicProg command-line host does not expose raw ID/config words to the GUI; it validates the selected model when each operation starts.
 
 ## 5. Menus overview
 

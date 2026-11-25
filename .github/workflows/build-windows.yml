@@ -1,0 +1,83 @@
+name: Windows desktop package
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Set up MSYS2 for the upstream Windows host helper
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gcc
+
+      - name: Build and smoke-test ArdPicProg Windows host
+        shell: msys2 {0}
+        run: bash packaging/build_host_windows.sh
+
+      - name: Install Arduino CLI and AVR core
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Compile ProgramPic firmware and stage avrdude
+        shell: pwsh
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr@1.8.6
+          ./packaging/build_firmware.ps1
+
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run static checks and test suite
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONPATH: "${{ github.workspace }}/src;${{ github.workspace }}"
+        run: |
+          python -m compileall -q src app
+          python -m pytest -q
+
+      - name: Build portable PyInstaller application
+        run: python -m PyInstaller --clean --noconfirm packaging/ardpicprog.spec
+
+      - name: Validate package inputs
+        shell: pwsh
+        run: |
+          $App = 'dist/Arduino-PIC-Programmer/Arduino-PIC-Programmer.exe'
+          if (!(Test-Path $App)) { throw "GUI executable missing: $App" }
+          if (!(Test-Path 'dist/Arduino-PIC-Programmer/_internal/tools/ardpicprog.exe')) { throw 'Bundled ArdPicProg helper missing.' }
+          if (!(Test-Path 'dist/Arduino-PIC-Programmer/_internal/tools/avrdude/avrdude.exe')) { throw 'Bundled avrdude missing.' }
+          if (!(Test-Path 'dist/Arduino-PIC-Programmer/_internal/tools/avrdude/avrdude.conf')) { throw 'Bundled avrdude.conf missing.' }
+          if (!(Test-Path 'dist/Arduino-PIC-Programmer/_internal/firmware/precompiled/uno.hex')) { throw 'Uno ProgramPic firmware missing.' }
+
+      - name: Create portable ZIP
+        shell: pwsh
+        run: Compress-Archive -Path 'dist/Arduino-PIC-Programmer/*' -DestinationPath 'dist/Arduino-PIC-Programmer-Windows-x64.zip' -Force
+
+      - name: Upload candidate build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arduino-PIC-Programmer-Windows-x64-candidate
+          path: dist/Arduino-PIC-Programmer-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14

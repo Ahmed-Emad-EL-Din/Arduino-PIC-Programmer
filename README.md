@@ -11,7 +11,7 @@ There is currently no published release or downloadable `.exe` asset in this rep
 ## 1. Hardware Connection & 13V Supply Circuit (LM317 + 24V DC)
 
 ### Required Components
-*   **Arduino Board:** Uno / Nano / Pro Mini / Mega / Leonardo / Micro
+*   **Arduino Board:** Uno / Nano / Mega / Leonardo / Micro, or only the 5 V / 16 MHz Pro Mini variant (3.3 V Pro Minis are not electrically compatible).
 *   **Target PIC MCU:** PIC16F84A (default) or 24 other supported MCUs (PIC12F675, PIC16F877A, etc.)
 *   **24V DC Power Supply** (Input)
 *   **LM317 Voltage Regulator Circuit** (Output: 13V VPP + 5V VDD)
@@ -23,7 +23,7 @@ There is currently no published release or downloadable `.exe` asset in this rep
 *Values: R1 = 120Ω, R2 = 2.2kΩ (Output ≈ 13V VPP), Input = 24V DC, Output Capacitor = 100nF, Pull-up = 10kΩ, PGM Pull-down = 4.7kΩ.*
 
 ### Wiring notes for supported PIC packages
-The generated workbench screenshots previously referenced here are not included in this checkout. The physical reference image above is the only circuit image currently provided.
+Official Ho-Ro wiring reference images are bundled in `assets/reference/`. Generated schematic and pinout views are provided by the desktop inspector; pin mappings not explicitly verified by this application are marked for datasheet confirmation.
 
 **A. ZIF-18 Direct Mode (8-pin & 18-pin PICs)**
 *   **PIC16F84A (18-pin):** JP3 = `1-2`. Pins: VDD=14, VSS=5, MCLR=4(RA5), PGC=12(RB6), PGD=13(RB7), PGM=10(RB4).
@@ -42,10 +42,10 @@ The HEX memory-map inspector is an application feature; no screenshot is include
 1. Launch **Arduino-PIC-Programmer.exe**.
 2. Menu **Programmer → Flash Arduino Firmware…**
 3. Pick board (e.g., *Arduino Uno*) and COM port.
-4. Press **Flash Firmware** if the firmware files and `avrdude` are available in your build.
+4. Press **Flash Firmware** in a build that contains the matching precompiled firmware and bundled `avrdude`.
 5. Confirm success only after the uploader reports that ProgramPic firmware was uploaded.
 
-> This checkout does not contain firmware files or a published Windows executable, so the described flash flow cannot be run from this snapshot as-is.
+> The firmware source and Windows build scripts are present, but no published Windows executable is available yet. Some board bootloader flows (currently Leonardo/Micro) must be flashed using Arduino IDE until their port-reset flow is implemented.
 
 ### Step 2 — Connect & Verify
 1. Connect Arduino to PC. Connect 24V DC to LM317 circuit.
@@ -56,33 +56,26 @@ The HEX memory-map inspector is an application feature; no screenshot is include
 ### Step 3 — Load HEX & Select MCU
 1. **Open HEX…** (`Ctrl+O`) or drag-and-drop `.hex` file.
 2. Pick Target MCU (e.g., **PIC16F84A**) from dropdown.
-3. **Detect Chip** (`F6`) — verifies Device ID matches selection.
+3. **Detect Chip** (`F6`) — asks the ProgramPic host to identify a supported device. The raw ID/config values are not exposed by the upstream CLI; every destructive operation re-asks the host to validate the selected device.
 
 ### Step 4 — Preflight & Programming
 1. **Preflight Checklist** appears (VPP LED, Socket, Jumper, Voltage). Tick all items.
 2. **Confirmation Dialog** shows exact operation (Erase → Write → Verify → Safe State).
 3. Press **Program & Verify** (`Ctrl+R`).
-4. **Activity Log** tracks progress:
-   ```
-   Step 1/5 — verify chip identity … Detected: PIC16F84A … identity OK
-   Step 2/5 — erase chip …
-   Step 3/5 — write program memory …
-   Step 4/5 — READ BACK & VERIFY … ✓ verify passed
-   Step 5/5 — power off socket (safe state) …
-   ```
-5. **SUCCESS** dialog appears.
+4. The Activity Log shows the upstream host's erase/write/read output, followed by a read-back comparison for every supplied address. The host closes its serial port on exit and sends its documented `PWROFF` command.
+5. A success message appears only if the host operation and configured read-back verification pass.
 
 ### Step 5 — Other Operations
 *   **Erase Only…** — bulk erase with calibration preservation.
 *   **Verify vs File** — read chip and compare against loaded HEX.
 *   **Read Chip → Save HEX…** (`Ctrl+S`) — backup chip to Intel HEX.
-*   **Device Info** — port, firmware version, device ID, config word.
+*   **Device Info** — port, firmware version, selected target, package and memory sizes. The upstream CLI does not expose raw ID/config values to this window.
 
 ---
 
 ## 3. Safety Interlocks (intended behavior)
 
-These safeguards are described by the application design. This checkout is incomplete and cannot currently be run to verify them; always verify hardware wiring and firmware independently.
+The source implements these gates, but it has not yet been validated on physical programmer hardware. Always confirm the exact MCU datasheet, wiring, and VPP supply independently; do not use an untested build for destructive operations.
 | Gate | Behaviour |
 |---|---|
 | Programmer verified | Handshake required before any command |
@@ -109,29 +102,33 @@ PIC16F872, PIC16F877/A, PIC16F882–887, PIC12F629, PIC12F675, PIC12F683.
 * **Windows 10/11:** no Windows executable is currently published.
 * **Arduino Board** + **LM317 13V Circuit** + **ZIF/ICSP Shield** for hardware use.
 * **24V DC Supply** (as used in the circuit image above; verify your exact circuit design).
-* Firmware and `avrdude` are not present in this checkout.
+* Firmware source is in `firmware/source/`; Windows build scripts compile board-specific firmware and stage `avrdude` for the portable package.
+* A Windows executable has not yet been published; build results must pass the Windows and hardware acceptance checklist before release.
 
 ---
 
-## 6. Project Layout (files present in this checkout)
+## 6. Project Layout
 ```
-├── plain.md                  # repair checklist
-├── src/core/                 # MCU database and safety logic only
-├── src/gui/                  # main window and widgets only
-├── src/tests/                # GUI integration tests
-├── packaging/                # PyInstaller spec (referenced input folders are absent)
-├── docs/                     # user guide
-└── image-search/             # LM317 circuit image
+├── app/                      # application identity and persistent settings
+├── src/main.py               # desktop entry point
+├── src/core/                 # HEX, safety, wiring, serial-host adapter
+├── src/gui/                  # Qt workbench, dialogs, workers, inspectors
+├── src/tests/                # integration and core regression tests
+├── firmware/source/          # upstream ProgramPic Arduino sketch
+├── vendor/ArdPicProg/        # upstream GPL-3.0 host implementation
+├── packaging/                # PyInstaller and Windows build scripts
+├── .github/workflows/        # Windows candidate-package workflow
+└── docs/                     # user guide and hardware notes
 ```
 
-This is not a complete runnable/buildable application snapshot: several modules imported by the GUI, application entry point, firmware, assets, and build workflow are missing.
+The source and candidate build pipeline are now present. The Windows workflow and hardware programming path still require a successful Windows run and physical-device acceptance tests; no release asset is published yet.
 
 ---
 
 ## 7. Credits & License
 * **Author:** Ahmed Emad El-Din Hussein · [https://github.com/Ahmed-Emad-EL-Din](https://github.com/Ahmed-Emad-EL-Din)
-* **Firmware reference:** ProgramPic v1.8.horo (Ho-Ro/ArdPicProg)
-* **License:** No `LICENSE` file is included in this checkout; confirm licensing before redistribution.
+* **Firmware and host protocol:** ProgramPic v1.8.horo / ArdPicProg (Ho-Ro / Southern Storm Software), GPL-3.0; see [`LICENSE`](LICENSE) and `vendor/ArdPicProg/UPSTREAM.md`.
+* **Python GUI:** project source in this repository; see `LICENSE` for distribution terms.
 
 ---
 
