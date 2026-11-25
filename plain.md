@@ -97,7 +97,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - `bash packaging/build_host_posix.sh`: built the upstream C++ helper into ignored `tools/ardpicprog`; CLI help smoke test passed.
 - `git diff --check`: passed on the current changes.
 - PyInstaller spec path was corrected after an initial failed attempt. A Linux packaging attempt is still blocked because the sandbox Python lacks `libpython3.11.so.1.0`; this is not a Windows build result.
-- Full Qt GUI tests are not yet run: Linux system libraries `libGL.so.1`, `libEGL.so.1`, `libxkbcommon.so.0`, and `libdbus-1.so.3` are absent. The Windows workflow is intended to provide the supported runtime test.
+- Full `pytest src/tests` collection was attempted and is blocked in this Linux image because importing PySide6 fails on missing `libGL.so.1`; focused non-GUI tests pass. Other Qt runtime libraries may also be absent. The Windows workflow is intended to provide the supported GUI runtime test.
 - No Windows candidate build has completed, no physical hardware test has been performed, and no downloadable EXE/release asset exists yet.
 
 ## Remaining release blockers

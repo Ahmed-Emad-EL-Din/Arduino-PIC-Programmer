@@ -79,15 +79,15 @@ The source implements these gates, but it has not yet been validated on physical
 | Gate | Behaviour |
 |---|---|
 | Programmer verified | Handshake required before any command |
-| Device-ID match | Chip ID must equal selected MCU (mask `0xFFE0`) |
-| Empty socket / no VPP | ID `0x3FFF` or unreadable chip → refused |
-| No-ID chips (PIC16F84) | Explicit warnings + forced `SETDEVICE` map |
+| Device selection | Host detection is requested, but raw silicon ID/config values are not exposed to the GUI; do not treat a displayed model as a measured ID |
+| Empty socket / no VPP | Host detection errors may be surfaced; physical empty-socket/VPP failure behavior is not hardware-validated |
+| No-ID chips (PIC16F84) | Manual target-selection warning; electronic identity cannot distinguish devices with no silicon ID |
 | HEX fit check | HEX must only touch existing regions |
 | Preflight checklist | VPP LED, socket, jumper, voltage — all items ticked |
 | Confirmations | Erase/program dialogs spell out exact actions |
 | Verify after write | ON by default; extra confirmation to disable |
-| Safe state | `PWROFF` after every operation, errors, cancel, close |
-| Firmware safety net | ProgramPic auto power-offs after 2s inactivity |
+| Safe state | Upstream host sends its documented `PWROFF` during normal shutdown; abnormal process termination and physical safe-state behavior still need hardware validation |
+| Firmware safety net | Upstream firmware documents an inactivity power-off; this behavior has not been validated in this application's hardware acceptance tests |
 
 ---
 
