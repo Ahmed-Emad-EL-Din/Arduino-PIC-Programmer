@@ -18,58 +18,23 @@
 *   **Wiring:** D2→VDD, D3→MCLR/VPP, D4→CLK, D5→DATA, /RESET→2.2µF Cap→GND
 
 ### 13V VPP Supply Diagram (LM317 + 24V DC)
-```text
-24V DC (+) ────┬───────────────[ 100nF ]───────────────┐
-               │                                       │
-               │          [ LM317 ]                    │
-               │   IN ────┬─── ADJ ───┬─── OUT ────────┤
-               │          │    │      │                │
-               │        [R1]  │    [R2]               │
-               │       120Ω   │    2.2kΩ              │
-               │          │    │      │                │
-               │          └───┼──────┘                │
-               │              │                       │
-               │            [10kΩ]                    │
-               │              │                       │
-               │            [LED] (VPP OK)            │
-               │              │                       │
-               │          [ 10kΩ ] (Pull-up)          │
-               │              │                       │
-               └──────────────┼─────────────── 13V VPP ┤
-                              │                       │
-                              │                       │
-                              │    [ 4.7kΩ PGM ]      │
-                              │          │            │
-                              │        [GND]          │
-                              │                       │
-               ┌──────────────┴───────────────┐       │
-               │                              │       │
-               │        [ ZIF-18 Socket ]     │       │
-               │      (Pin-1 Notch / JP3)     │       │
-               │                              │       │
-               └──────────────┬───────────────┘       │
-                              │                       │
-               Arduino D2 ────┼─── VDD (+5V)           │
-               Arduino D3 ────┼─── MCLR/VPP (13V)      │
-               Arduino D4 ────┼─── CLK (PGC)           │
-               Arduino D5 ────┼─── DATA (PGD)          │
-               Arduino /RESET ┼───[ 2.2µF ]─── GND     │
-                              │                       │
-               Arduino GND ───┴───────────────────────┘
-```
+![LM317 13V VPP Circuit](image-search/lm317-13v-vpp-circuit-diagram-24v-dc-sup-1.jpg)
+*Values: R1 = 120Ω, R2 = 2.2kΩ (Output ≈ 13V VPP), Input = 24V DC, Output Capacitor = 100nF, Pull-up = 10kΩ, PGM Pull-down = 4.7kΩ.*
 
 ### Accurate Circuit Diagrams (Dynamic per MCU)
 **A. ZIF-18 Direct Mode (8-pin & 18-pin PICs)**
+![Workbench Dark Schematic 84A](docs/screenshots/workbench_dark_schematic_84a.png)
 *   **PIC16F84A (18-pin):** JP3 = `1-2`. Pins: VDD=14, VSS=5, MCLR=4(RA5), PGC=12(RB6), PGD=13(RB7), PGM=10(RB4).
 *   **PIC12F675 (8-pin):** JP3 = `2-3`. Pins: VDD=1, VSS=8, MCLR=4(GP3), PGC=6(GP1), PGD=7(GP0).
-*   **Visual:** [Image: docs/screenshots/workbench_dark_schematic_84a.png] (ZIF-18 JP3=1-2) | [Image: docs/screenshots/workbench_light_zif8_675.png] (ZIF-18 JP3=2-3)
+*   **Visual:** [Image: docs/screenshots/workbench_light_zif8_675.png] (ZIF-18 JP3=2-3)
 
 **B. ICSP Cable / Adapter Mode (14/20/28/40-pin PICs)**
+![Workbench Dark ICSP 877A](docs/screenshots/workbench_dark_icsp_877a.png)
 *   **PIC16F877A (40-pin):** ICSP Header. Pins: VDD=11&32, VSS=12&31, MCLR=1, PGC=39(RB6), PGD=40(RB7), PGM=36(RB3).
-*   **Visual:** [Image: docs/screenshots/workbench_dark_icsp_877a.png] (ICSP 40-pin mode)
 
 **C. HEX Memory Map Inspector**
-*   [Image: docs/screenshots/workbench_dark_hex_map.png] (Visual usage bars + flat word dump)
+![Workbench Dark Hex Map](docs/screenshots/workbench_dark_hex_map.png)
+(Visual usage bars + flat word dump)
 
 ---
 
