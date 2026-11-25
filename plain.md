@@ -13,6 +13,7 @@ This checklist is the source of truth for making a complete, safe, reproducible 
 
 - [x] Inspect tracked files, branch contents, packaging specification, README, and user guide.
 - [x] Check GitHub branches/tags/releases for a complete source tree and existing Windows assets.
+- [x] Inspect the official `Ho-Ro/ArdPicProg` repository as a possible recovery source: it contains the legacy C++ command-line host and Arduino `ProgramPic` sketch, but not the missing custom PySide desktop GUI modules.
 - [x] Confirm the `v0.1.0` GitHub Release has no downloadable assets; no Windows `.exe` is currently available.
 - [x] Confirm the checkout has no `.github/workflows`, `src/main.py`, `firmware/`, or `assets/` directory.
 - [x] Confirm the current PyInstaller spec expects missing entry-point and data files, and the GUI imports modules absent from this checkout.
