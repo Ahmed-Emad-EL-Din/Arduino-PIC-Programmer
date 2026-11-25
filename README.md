@@ -1,7 +1,8 @@
-# Arduino-PIC Programmer — Professional Desktop EXE
+# Arduino-PIC Programmer
 
-**Direct Download (Windows x64 EXE):**
-[Click here to download Arduino-PIC-Programmer.exe](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases/download/v2.0.0/Arduino-PIC-Programmer-Windows-x64.zip) *(Extract the ZIP and run the EXE — build triggered by tag v2.0.0 or manual dispatch via GitHub Actions workflow `.github/workflows/build-windows.yml`)*
+**Windows download:** [Check the project releases](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases).
+
+There is currently no published release or downloadable `.exe` asset in this repository. The previously documented `v2.0.0` URL was broken, so it has been removed instead of being presented as a working download. A Windows build must be published before a direct executable link can be provided.
 
 **Made By:** Ahmed Emad El-Din Hussein · [https://github.com/Ahmed-Emad-EL-Din](https://github.com/Ahmed-Emad-EL-Din)
 
@@ -21,20 +22,17 @@
 ![LM317 13V VPP Circuit](image-search/lm317-13v-vpp-circuit-diagram-24v-dc-sup-1.jpg)
 *Values: R1 = 120Ω, R2 = 2.2kΩ (Output ≈ 13V VPP), Input = 24V DC, Output Capacitor = 100nF, Pull-up = 10kΩ, PGM Pull-down = 4.7kΩ.*
 
-### Accurate Circuit Diagrams (Dynamic per MCU)
+### Wiring notes for supported PIC packages
+The generated workbench screenshots previously referenced here are not included in this checkout. The physical reference image above is the only circuit image currently provided.
+
 **A. ZIF-18 Direct Mode (8-pin & 18-pin PICs)**
-![Workbench Dark Schematic 84A](docs/screenshots/workbench_dark_schematic_84a.png)
 *   **PIC16F84A (18-pin):** JP3 = `1-2`. Pins: VDD=14, VSS=5, MCLR=4(RA5), PGC=12(RB6), PGD=13(RB7), PGM=10(RB4).
 *   **PIC12F675 (8-pin):** JP3 = `2-3`. Pins: VDD=1, VSS=8, MCLR=4(GP3), PGC=6(GP1), PGD=7(GP0).
-*   **Visual:** [Image: docs/screenshots/workbench_light_zif8_675.png] (ZIF-18 JP3=2-3)
 
 **B. ICSP Cable / Adapter Mode (14/20/28/40-pin PICs)**
-![Workbench Dark ICSP 877A](docs/screenshots/workbench_dark_icsp_877a.png)
 *   **PIC16F877A (40-pin):** ICSP Header. Pins: VDD=11&32, VSS=12&31, MCLR=1, PGC=39(RB6), PGD=40(RB7), PGM=36(RB3).
 
-**C. HEX Memory Map Inspector**
-![Workbench Dark Hex Map](docs/screenshots/workbench_dark_hex_map.png)
-(Visual usage bars + flat word dump)
+The HEX memory-map inspector is an application feature; no screenshot is included in this repository snapshot.
 
 ---
 
@@ -44,8 +42,10 @@
 1. Launch **Arduino-PIC-Programmer.exe**.
 2. Menu **Programmer → Flash Arduino Firmware…**
 3. Pick board (e.g., *Arduino Uno*) and COM port.
-4. Press **Flash Firmware** (uses bundled `avrdude`).
-5. Confirm success (ProgramPic v1.8.horo uploaded).
+4. Press **Flash Firmware** if the firmware files and `avrdude` are available in your build.
+5. Confirm success only after the uploader reports that ProgramPic firmware was uploaded.
+
+> This checkout does not contain firmware files or a published Windows executable, so the described flash flow cannot be run from this snapshot as-is.
 
 ### Step 2 — Connect & Verify
 1. Connect Arduino to PC. Connect 24V DC to LM317 circuit.
@@ -80,7 +80,9 @@
 
 ---
 
-## 3. Safety Design (Zero Hardware Damage)
+## 3. Safety Interlocks (intended behavior)
+
+These safeguards are described by the application design. This checkout is incomplete and cannot currently be run to verify them; always verify hardware wiring and firmware independently.
 | Gate | Behaviour |
 |---|---|
 | Programmer verified | Handshake required before any command |
@@ -104,31 +106,32 @@ PIC16F872, PIC16F877/A, PIC16F882–887, PIC12F629, PIC12F675, PIC12F683.
 ---
 
 ## 5. Requirements
-* **Windows 10/11** (EXE build)
-* **Arduino Board** + **LM317 13V Circuit** + **ZIF/ICSP Shield**
-* **24V DC Supply** (Input for LM317)
-* **Bundled avrdude** (included in EXE)
+* **Windows 10/11:** no Windows executable is currently published.
+* **Arduino Board** + **LM317 13V Circuit** + **ZIF/ICSP Shield** for hardware use.
+* **24V DC Supply** (as used in the circuit image above; verify your exact circuit design).
+* Firmware and `avrdude` are not present in this checkout.
 
 ---
 
-## 6. Project Layout (Internal)
+## 6. Project Layout (files present in this checkout)
 ```
-├── plain.md                  # task plan (all [x])
-├── src/                      # core engine + GUI (PySide6)
-├── firmware/                 # ProgramPic v1.8.horo sketch
-├── tools/                    # avrdude (bundled)
-├── assets/                   # reference schematics & icons
-├── packaging/                # PyInstaller spec
-└── docs/                     # user guide + screenshots
+├── plain.md                  # repair checklist
+├── src/core/                 # MCU database and safety logic only
+├── src/gui/                  # main window and widgets only
+├── src/tests/                # GUI integration tests
+├── packaging/                # PyInstaller spec (referenced input folders are absent)
+├── docs/                     # user guide
+└── image-search/             # LM317 circuit image
 ```
+
+This is not a complete runnable/buildable application snapshot: several modules imported by the GUI, application entry point, firmware, assets, and build workflow are missing.
 
 ---
 
 ## 7. Credits & License
 * **Author:** Ahmed Emad El-Din Hussein · [https://github.com/Ahmed-Emad-EL-Din](https://github.com/Ahmed-Emad-EL-Din)
-* **Firmware:** ProgramPic v1.8.horo (Ho-Ro/ArdPicProg) — GPL-3.0
-* **Design:** Unslop Desktop Workbench (4px grid, >=4.5:1 contrast)
-* **License:** GPL-3.0 — see [LICENSE](LICENSE)
+* **Firmware reference:** ProgramPic v1.8.horo (Ho-Ro/ArdPicProg)
+* **License:** No `LICENSE` file is included in this checkout; confirm licensing before redistribution.
 
 ---
 
