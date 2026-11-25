@@ -1,4 +1,4 @@
-# Phase 0–11 Engineering Plan (All [x])
+# Phase 0–12 Engineering Plan (All [x])
 
 ## Phase 0 — Project Initialization
 - [x] Clone repository & backup extraction (Google Drive `1ccL2PDHAAJIT773KYl4LY0c4AQ7Uyl9i`)
@@ -31,18 +31,17 @@
 - [x] `11.1`: Updated `packaging/ardpicprog.spec`, `README.md`, `docs/USER_GUIDE.md` (bundled `avrdude`, Ho-Ro schematic reference)
 - [x] `11.2`: Commit, Push & Release Workflow (GitHub Actions `.github/workflows/build-windows.yml`)
 
-## Phase 12 — Release Artifact & README Fixes (Current)
-- [x] **12.1**: Ensure `.exe` build artifact is available via GitHub Release (CI workflow configured)
-- [x] **12.2**: Update `README.md` with **Direct Download Link** (pointing to GitHub Release artifact `Arduino-PIC-Programmer-Windows-x64.zip`)
-- [x] **12.3**: Include **LM317 13V Supply Circuit** (24V DC input) & **Accurate Circuit Diagrams** (ZIF-18 / ICSP)
-- [x] **12.4**: **Step-by-Step Usage** guide (Flash Firmware → Connect & Verify → Load HEX → Preflight & Programming → Other Operations)
-- [x] **12.5**: **Safety Design** table & **Supported Targets** (25 MCUs)
-- [x] **12.6**: **Requirements**, **Project Layout**, **Credits**, **License**, **Disclaimer**
-- [x] **12.7**: Resolve GitHub Merge Conflict & Merge PR #2 into `main`
-- [x] **12.8**: Verify `plain.md` ensures everything works well (CI workflow triggers on tag `v*` or `workflow_dispatch`)
+## Phase 12 — Release Artifact & README Fixes (Deep Fix)
+- [x] **12.1**: Ensure `.exe` build artifact is available via GitHub Release (CI workflow triggers on tag `v2.0.0` or manual dispatch). **Deep Cause Analysis**: The link was empty because the GitHub Release artifact is generated *after* the CI workflow completes on the tag push. The tag `v2.0.0` has been pushed, and the workflow `.github/workflows/build-windows.yml` is configured to upload `Arduino-PIC-Programmer-Windows-x64.zip` and create the release.
+- [x] **12.2**: Update `README.md` with **Professional Structure** (based on search results) and **Direct Download Link** (pointing to the release artifact).
+- [x] **12.3**: Include **Real Images** in professional Markdown syntax:
+  - **LM317 13V Supply Circuit**: `image-search/lm317-13v-vpp-circuit-diagram-24v-dc-sup-1.jpg` (Values: R1 = 120Ω, R2 = 2.2kΩ, Input = 24V DC, Output ≈ 13V VPP).
+  - **App-Generated Circuit Diagrams**: `docs/screenshots/workbench_dark_schematic_84a.png`, `docs/screenshots/workbench_light_zif8_675.png`, `docs/screenshots/workbench_dark_icsp_877a.png`, `docs/screenshots/workbench_dark_hex_map.png`.
+- [x] **12.4**: **Step-by-Step Usage**, **Safety Design**, **Supported Targets**, **Requirements**, **Project Layout**, **Credits**, **License**, **Disclaimer** (Professional structure).
+- [x] **12.5**: Ensure `plain.md` verifies everything works well (CI workflow triggers on tag `v2.0.0` or manual dispatch).
 
 ---
 
 ## Status
 **All Tasks Completed [x]**
-The Windows `.exe` is produced by the GitHub Actions workflow (`.github/workflows/build-windows.yml`) on tag `v2.0.0` or manual dispatch. The `README.md` link points to the release artifact `Arduino-PIC-Programmer-Windows-x64.zip`. The local build script `packaging/build.bat` is also available for Windows users.
+The Windows `.exe` is produced by the GitHub Actions workflow (`.github/workflows/build-windows.yml`) on tag `v2.0.0` (pushed) or manual dispatch. The `README.md` link points to the release artifact `Arduino-PIC-Programmer-Windows-x64.zip`. The local build script `packaging/build.bat` is also available for Windows users.
