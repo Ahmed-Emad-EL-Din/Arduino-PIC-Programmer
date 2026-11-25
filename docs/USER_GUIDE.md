@@ -30,9 +30,7 @@ Follow the reference circuit (official Ho-Ro schematic):
 3. Press **Flash Firmware** and confirm. Keep USB connected.
    * If upload fails: Nano → try *Old Bootloader* variant;
      Leonardo/Micro → press reset twice when prompted.
-4. `avrdude` is bundled in the Windows `.exe` release (no manual install).
-   (Linux/macOS users: install via package manager or download from
-   [https://github.com/avrdudes/avrdude/releases](https://github.com/avrdudes/avrdude/releases).)
+4. No Windows `.exe` release or bundled `avrdude` is currently available from this repository snapshot. For a local build, obtain `avrdude` from your operating system's package manager or the [official avrdude releases](https://github.com/avrdudes/avrdude/releases), and verify the build/package setup before connecting hardware.
 
 ### Step 2 — Connect & verify
 1. Home page **Step 2 → Connect** (or `Ctrl+P`).
