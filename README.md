@@ -1,114 +1,173 @@
-# Arduino-PIC Programmer
+# Arduino-PIC Programmer — Professional Desktop EXE
 
-**Professional desktop tool that turns an Arduino into a PIC programmer and
-uploads HEX files to PIC16F84A (and 25 other PIC devices) — safely.**
+**Direct Download (Windows x64 EXE):**
+[Click here to download Arduino-PIC-Programmer.exe](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases/download/v2.0.0/Arduino-PIC-Programmer-Windows-x64.zip) *(Extract the ZIP and run the EXE)*
 
-Made By: **Ahmed Emad El-Din Hussein** · <https://github.com/Ahmed-Emad-EL-Din>
-
-![Dark theme](docs/screenshot_dark.png)
+**Made By:** Ahmed Emad El-Din Hussein · [https://github.com/Ahmed-Emad-EL-Din](https://github.com/Ahmed-Emad-EL-Din)
 
 ---
 
-## What it does
+## 1. Hardware Connection & 13V Supply Circuit (LM317 + 24V DC)
 
-1. **Flash Arduino** — writes the *ProgramPic* (ArdPicProg-compatible, v1.8.horo)
-   firmware onto your Arduino (Uno, Nano old/new bootloader, Pro Mini
-   16/8 MHz, Mega 2560, Leonardo, Micro) using bundled `avrdude` (Windows EXE).
-2. **Connect & verify** — performs the `PROGRAM_PIC_VERSION` handshake.
-   *No hardware command is ever sent before this passes.*
-3. **Load HEX** — strict Intel-HEX parsing (checksum validation) using the
-   exact `hex_byte = flat_word × 2` address convention of the reference
-   `ardpicprog` host (program + config + EEPROM).
-4. **Detect chip** — reads the device ID from the ZIF socket and **hard-blocks
-   programming if it doesn't match the selected MCU**.
-5. **Program** — preflight checklist → confirmation → erase → write →
-   **mandatory read-back verify** → `PWROFF` (safe state).
+### Required Components
+*   **Arduino Board:** Uno / Nano / Pro Mini / Mega / Leonardo / Micro
+*   **Target PIC MCU:** PIC16F84A (default) or 24 other supported MCUs (PIC12F675, PIC16F877A, etc.)
+*   **24V DC Power Supply** (Input)
+*   **LM317 Voltage Regulator Circuit** (Output: 13V VPP + 5V VDD)
+*   **ZIF-18 Socket** (or ICSP Header for 14/20/28/40-pin MCUs)
+*   **Wiring:** D2→VDD, D3→MCLR/VPP, D4→CLK, D5→DATA, /RESET→2.2µF Cap→GND
 
-## Safety design (no room for hardware-destroying mistakes)
+### 13V VPP Supply Diagram (LM317 + 24V DC)
+```text
+24V DC (+) ────┬───────────────[ 100nF ]───────────────┐
+               │                                       │
+               │          [ LM317 ]                    │
+               │   IN ────┬─── ADJ ───┬─── OUT ────────┤
+               │          │    │      │                │
+               │        [R1]  │    [R2]               │
+               │       120Ω   │    2.2kΩ              │
+               │          │    │      │                │
+               │          └───┼──────┘                │
+               │              │                       │
+               │            [10kΩ]                    │
+               │              │                       │
+               │            [LED] (VPP OK)            │
+               │              │                       │
+               │          [ 10kΩ ] (Pull-up)          │
+               │              │                       │
+               └──────────────┼─────────────── 13V VPP ┤
+                              │                       │
+                              │                       │
+                              │    [ 4.7kΩ PGM ]      │
+                              │          │            │
+                              │        [GND]          │
+                              │                       │
+               ┌──────────────┴───────────────┐       │
+               │                              │       │
+               │        [ ZIF-18 Socket ]     │       │
+               │      (Pin-1 Notch / JP3)     │       │
+               │                              │       │
+               └──────────────┬───────────────┘       │
+                              │                       │
+               Arduino D2 ────┼─── VDD (+5V)           │
+               Arduino D3 ────┼─── MCLR/VPP (13V)      │
+               Arduino D4 ────┼─── CLK (PGC)           │
+               Arduino D5 ────┼─── DATA (PGD)          │
+               Arduino /RESET ┼───[ 2.2µF ]─── GND     │
+                              │                       │
+               Arduino GND ───┴───────────────────────┘
+```
 
+### Accurate Circuit Diagrams (Dynamic per MCU)
+**A. ZIF-18 Direct Mode (8-pin & 18-pin PICs)**
+*   **PIC16F84A (18-pin):** JP3 = `1-2`. Pins: VDD=14, VSS=5, MCLR=4(RA5), PGC=12(RB6), PGD=13(RB7), PGM=10(RB4).
+*   **PIC12F675 (8-pin):** JP3 = `2-3`. Pins: VDD=1, VSS=8, MCLR=4(GP3), PGC=6(GP1), PGD=7(GP0).
+*   **Visual:** [Image: docs/screenshots/workbench_dark_schematic_84a.png] (ZIF-18 JP3=1-2) | [Image: docs/screenshots/workbench_light_zif8_675.png] (ZIF-18 JP3=2-3)
+
+**B. ICSP Cable / Adapter Mode (14/20/28/40-pin PICs)**
+*   **PIC16F877A (40-pin):** ICSP Header. Pins: VDD=11&32, VSS=12&31, MCLR=1, PGC=39(RB6), PGD=40(RB7), PGM=36(RB3).
+*   **Visual:** [Image: docs/screenshots/workbench_dark_icsp_877a.png] (ICSP 40-pin mode)
+
+**C. HEX Memory Map Inspector**
+*   [Image: docs/screenshots/workbench_dark_hex_map.png] (Visual usage bars + flat word dump)
+
+---
+
+## 2. Step-by-Step Usage
+
+### Step 1 — Flash Arduino Firmware (Once)
+1. Launch **Arduino-PIC-Programmer.exe**.
+2. Menu **Programmer → Flash Arduino Firmware…**
+3. Pick board (e.g., *Arduino Uno*) and COM port.
+4. Press **Flash Firmware** (uses bundled `avrdude`).
+5. Confirm success (ProgramPic v1.8.horo uploaded).
+
+### Step 2 — Connect & Verify
+1. Connect Arduino to PC. Connect 24V DC to LM317 circuit.
+2. Select Board and COM Port in the app.
+3. Press **Connect Programmer** (`Ctrl+P`).
+4. Status chip turns **Green (Programmer: ✓ vX)** — Handshake passed.
+
+### Step 3 — Load HEX & Select MCU
+1. **Open HEX…** (`Ctrl+O`) or drag-and-drop `.hex` file.
+2. Pick Target MCU (e.g., **PIC16F84A**) from dropdown.
+3. **Detect Chip** (`F6`) — verifies Device ID matches selection.
+
+### Step 4 — Preflight & Programming
+1. **Preflight Checklist** appears (VPP LED, Socket, Jumper, Voltage). Tick all items.
+2. **Confirmation Dialog** shows exact operation (Erase → Write → Verify → Safe State).
+3. Press **Program & Verify** (`Ctrl+R`).
+4. **Activity Log** tracks progress:
+   ```
+   Step 1/5 — verify chip identity … Detected: PIC16F84A … identity OK
+   Step 2/5 — erase chip …
+   Step 3/5 — write program memory …
+   Step 4/5 — READ BACK & VERIFY … ✓ verify passed
+   Step 5/5 — power off socket (safe state) …
+   ```
+5. **SUCCESS** dialog appears.
+
+### Step 5 — Other Operations
+*   **Erase Only…** — bulk erase with calibration preservation.
+*   **Verify vs File** — read chip and compare against loaded HEX.
+*   **Read Chip → Save HEX…** (`Ctrl+S`) — backup chip to Intel HEX.
+*   **Device Info** — port, firmware version, device ID, config word.
+
+---
+
+## 3. Safety Design (Zero Hardware Damage)
 | Gate | Behaviour |
 |---|---|
-| Programmer verified | Every protocol call requires a successful handshake first |
-| Device-ID match | Chip ID must equal the selected MCU (mask `0xFFE0`) or the write is refused |
+| Programmer verified | Handshake required before any command |
+| Device-ID match | Chip ID must equal selected MCU (mask `0xFFE0`) |
 | Empty socket / no VPP | ID `0x3FFF` or unreadable chip → refused |
-| No-ID chips (PIC16F84) | Identity cannot be auto-verified → explicit warnings + forced `SETDEVICE` memory map |
-| HEX fit check | HEX must only touch regions that exist on the target |
-| Preflight checklist | VPP LED, socket, jumper, voltage — all items must be ticked (cannot be disabled) |
-| Confirmations | Erase/program dialogs spell out exactly what happens |
-| Verify after write | ON by default; turning it off requires extra confirmation |
-| Safe state | `PWROFF` after every operation, on errors, on cancel, and on app close |
-| Firmware safety net | ProgramPic auto power-offs after 2 s of host inactivity |
+| No-ID chips (PIC16F84) | Explicit warnings + forced `SETDEVICE` map |
+| HEX fit check | HEX must only touch existing regions |
+| Preflight checklist | VPP LED, socket, jumper, voltage — all items ticked |
+| Confirmations | Erase/program dialogs spell out exact actions |
+| Verify after write | ON by default; extra confirmation to disable |
+| Safe state | `PWROFF` after every operation, errors, cancel, close |
+| Firmware safety net | ProgramPic auto power-offs after 2s inactivity |
 
-## Supported targets
+---
 
+## 4. Supported Targets (25 MCUs)
 `PIC16F84A` (default), PIC16F84, PIC16F627/A, PIC16F628/A, PIC16F648A,
 PIC16F630, PIC16F676, PIC16F684, PIC16F688, PIC16F690, PIC16F87, PIC16F88,
-PIC16F872, PIC16F877/A, PIC16F882–887, PIC12F629, PIC12F675, PIC12F683 —
-26 devices total, transcribed from the ProgramPic v1.8.horo device table.
+PIC16F872, PIC16F877/A, PIC16F882–887, PIC12F629, PIC12F675, PIC12F683.
 
-## Requirements
+---
 
-* **Windows 10/11** (EXE build) · Linux · macOS
-* An Arduino (Uno/Nano/Mega/Pro Mini/Leonardo) with the
-  [ArdPicProg ZIF/ICSP shield circuit](https://rweather.github.io/ardpicprog/pic14_zif_circuit.html)
-* `avrdude` (auto-detected: bundled `tools/` → PATH → Arduino IDE)
+## 5. Requirements
+* **Windows 10/11** (EXE build)
+* **Arduino Board** + **LM317 13V Circuit** + **ZIF/ICSP Shield**
+* **24V DC Supply** (Input for LM317)
+* **Bundled avrdude** (included in EXE)
 
-## Run from source
+---
 
-```bash
-pip install -r requirements.txt
-python src/main.py
+## 6. Project Layout (Internal)
 ```
-
-## Build the Windows EXE
-
-```bat
-:: on Windows (cmd)
-packaging\build.bat
-```
-or use the included GitHub Actions workflow
-(`.github/workflows/build-windows.yml`) which produces
-`dist/Arduino-PIC-Programmer.exe` on every tag — ready to publish.
-
-See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for the full workflow and
-wiring instructions.
-
-## Project layout
-
-```
-├── plain.md                  # task plan (checked off as work completes)
-├── src/
-│   ├── main.py               # entry point
-│   ├── app/                  # metadata + settings
-│   ├── core/                 # ihex · mcu_db · protocol · serial_link
-│   │                         # avrdude · programmer · safety  (unit-tested)
-│   ├── gui/                  # theme (design system) · workers · dialogs
-│   └── tests/                # 32 tests incl. simulated ArdPicProg device
-├── firmware/
-│   ├── source/ProgramPic/    # ProgramPic v1.8.horo sketch (Ho-Ro/ArdPicProg)
-│   └── precompiled/          # uno · mega2560 · leonardo hex (arduino-cli)
-├── tools/                    # avrdude (auto-downloaded on build)
-├── assets/                   # icon.ico / icon.png
-├── packaging/                # PyInstaller spec + build scripts
+├── plain.md                  # task plan (all [x])
+├── src/                      # core engine + GUI (PySide6)
+├── firmware/                 # ProgramPic v1.8.horo sketch
+├── tools/                    # avrdude (bundled)
+├── assets/                   # reference schematics & icons
+├── packaging/                # PyInstaller spec
 └── docs/                     # user guide + screenshots
 ```
 
-## Credits
+---
 
-* [Ho-Ro/ArdPicProg](https://github.com/Ho-Ro/ArdPicProg) — ProgramPic
-  firmware & device table (GPL-3.0)
-* [rweather/ardpicprog](https://github.com/rweather/ardpicprog) — original
-  project, protocol, ZIF circuit
-* [Ho-Ro/QPICkit](https://github.com/Ho-Ro/QPICkit) — host UX inspiration
-* [avrdude](https://github.com/avrdudes/avrdude) — Arduino flashing
-* Qt `qt-ui-design` agent skill + UI/UX Pro Max — GUI design guidance
+## 7. Credits & License
+* **Author:** Ahmed Emad El-Din Hussein · [https://github.com/Ahmed-Emad-EL-Din](https://github.com/Ahmed-Emad-EL-Din)
+* **Firmware:** ProgramPic v1.8.horo (Ho-Ro/ArdPicProg) — GPL-3.0
+* **Design:** Unslop Desktop Workbench (4px grid, >=4.5:1 contrast)
+* **License:** GPL-3.0 — see [LICENSE](LICENSE)
 
-## License
+---
 
-GPL-3.0 — see [LICENSE](LICENSE).
-
-## Disclaimer
-
+## 8. Disclaimer
 High-voltage (≈13 V) programming circuitry is involved. The author assumes
 no responsibility for damaged chips, boards, or injury. Always verify
 wiring, VPP supply, and device selection before programming.
