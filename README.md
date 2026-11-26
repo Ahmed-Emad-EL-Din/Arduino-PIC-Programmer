@@ -2,7 +2,7 @@
 
 ## Windows build status
 
-**Candidate build:** the screenshot-enabled Windows CI build passed for commit `addb764`. [Open the successful GitHub Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45729144989), then scroll to **Artifacts** and download **Arduino-PIC-Programmer-Windows-x64-candidate**. GitHub downloads the Actions artifact as an outer ZIP; extract that first to find the candidate ZIP and its `.sha256` sidecar. In PowerShell, verify the candidate ZIP before extracting it:
+**Candidate build:** the screenshot-enabled Windows CI build passed for commit `8b61be2`. [Open the successful GitHub Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45819350412), then scroll to **Artifacts** and download **Arduino-PIC-Programmer-Windows-x64-candidate**. GitHub downloads the Actions artifact as an outer ZIP; extract that first to find the candidate ZIP and its `.sha256` sidecar. In PowerShell, verify the candidate ZIP before extracting it:
 
 ```powershell
 $zip = 'Arduino-PIC-Programmer-Windows-x64.zip'
@@ -21,22 +21,22 @@ This is a temporary Actions artifact (14-day retention; GitHub sign-in/repositor
 
 ---
 
-## 1. Hardware Connection & 13V Supply Circuit (LM317 + 24V DC)
+## 1. Hardware connections and VPP supply reference
 
-### Required Components
-*   **Arduino Board:** Uno / Nano / Mega / Leonardo / Micro, or only the 5 V / 16 MHz Pro Mini variant (3.3 V Pro Minis are not electrically compatible).
-*   **Target PIC MCU:** PIC16F84A (default) or 24 other supported MCUs (PIC12F675, PIC16F877A, etc.)
-*   **24V DC Power Supply** (Input)
-*   **LM317 Voltage Regulator Circuit** (Output: 13V VPP + 5V VDD)
-*   **ZIF-18 Socket** (or ICSP Header for 14/20/28/40-pin MCUs)
-*   **Wiring:** D2→VDD, D3→MCLR/VPP, D4→CLK, D5→DATA, /RESET→2.2µF Cap→GND
+### Required hardware
+- **Arduino:** Uno, Nano, Mega, Leonardo/Micro, or 5 V / 16 MHz Pro Mini. The 3.3 V Pro Mini is not electrically compatible.
+- **Target PIC:** one of the supported devices; confirm its exact package and pinout in the device datasheet.
+- **Programmer interface:** ArdPicProg shield or equivalent ZIF/ICSP wiring. D2=VDD, D3=MCLR/VPP, D4=CLK, D5=DATA. Some boards need the reset capacitor noted in the board-specific wiring reference.
+- **VPP supply:** use the supply specified by the exact programmer hardware. The LM317 drawing below is a calculation/reference circuit, not a validated substitute for the official ArdPicProg shield. The user guide's official shield reference calls for a 16–20 V input; do not apply 24 V to that shield unless its documentation explicitly permits it.
 
-### 13V VPP Supply Diagram (LM317 + 24V DC)
-![LM317 13V VPP Circuit](image-search/lm317-13v-vpp-circuit-diagram-24v-dc-sup-1.jpg)
-*Values: R1 = 120Ω, R2 = 2.2kΩ (Output ≈ 13V VPP), Input = 24V DC, Output Capacitor = 100nF, Pull-up = 10kΩ, PGM Pull-down = 4.7kΩ.*
+### LM317 reference circuit: 24 V DC to approximately 13 V VPP
+
+![Reference-only LM317 circuit for approximately 13 V VPP from 24 V DC](docs/images/lm317-24v-to-13v-vpp.svg)
+
+This is the standard LM317 adjustable-regulator topology: R1=120 Ω from OUT to ADJ and R2=1.12 kΩ from ADJ to common, giving approximately 13.0 V nominal from the LM317 equation. It shows a 0.1 µF input bypass capacitor and 1 µF output capacitor. The output is **VPP only**; target VDD is a separate programmer rail, not another LM317 output. Use a regulated, current-limited 24 V DC source, a suitable heatsink, and check the output with a meter before connecting a target. Regulator dissipation depends on load (approximately (24−13) × load current). Actual output, current capacity, thermal performance, protection, and compatibility with a particular programmer have not been validated here. Do not use this reference to build or operate hardware for destructive programming without independent design review and bench testing.
 
 ### Wiring notes for supported PIC packages
-Official Ho-Ro wiring reference images are bundled in `assets/reference/`. Generated schematic and pinout views are provided by the desktop inspector; pin mappings not explicitly verified by this application are marked for datasheet confirmation.
+Official Ho-Ro reference images are bundled in `assets/reference/`. The desktop inspector's generated view is an illustrative wiring overview, not an electrical schematic; use the official reference and exact device datasheet to confirm connections. Unverified pin mappings are flagged.
 
 **A. ZIF-18 Direct Mode (8-pin & 18-pin PICs)**
 *   **PIC16F84A (18-pin):** JP3 = `1-2`. Pins: VDD=14, VSS=5, MCLR=4(RA5), PGC=12(RB6), PGD=13(RB7), PGM=10(RB4).
@@ -61,7 +61,7 @@ The HEX memory-map inspector is an application feature; no screenshot is include
 > The firmware source and Windows build scripts are present, but no published Windows executable is available yet. Some board bootloader flows (currently Leonardo/Micro) must be flashed using Arduino IDE until their port-reset flow is implemented.
 
 ### Step 2 — Connect & Verify
-1. Connect Arduino to PC. Connect 24V DC to LM317 circuit.
+1. Connect the Arduino by USB. Only connect an external VPP supply that matches the exact programmer hardware; the reference LM317 circuit above is not hardware-validated.
 2. Select Board and COM Port in the app.
 3. Press **Connect Programmer** (`Ctrl+P`).
 4. Status chip turns **Green (Programmer: ✓ vX)** — Handshake passed.
@@ -134,7 +134,7 @@ PIC16F872, PIC16F877/A, PIC16F882–887, PIC12F629, PIC12F675, PIC12F683.
 └── docs/                     # user guide and hardware notes
 ```
 
-The source and candidate build pipeline are now present. The Windows workflow and hardware programming path still require a successful Windows run and physical-device acceptance tests; no release asset is published yet.
+The Windows candidate workflow has passed; a clean-machine launch and physical-device acceptance tests remain outstanding. No validated release asset is published yet.
 
 ---
 

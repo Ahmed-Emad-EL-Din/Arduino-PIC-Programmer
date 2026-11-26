@@ -100,8 +100,8 @@ class MainWindow(QMainWindow):
         self._refresh_actions()
 
         self.log(
-            f"{APP_NAME} v{VERSION} ready — select your Arduino board & PIC MCU to inspect "
-            "the exact circuit schematic, connect the programmer, and upload a .hex image.",
+            f"{APP_NAME} v{VERSION} ready — select your Arduino board and PIC to view the wiring reference, "
+            "connect the programmer, then open a .hex file.",
             "OK",
         )
 
@@ -169,7 +169,7 @@ class MainWindow(QMainWindow):
         lcol.addStretch(1)
         left_scroll.setWidget(left_body)
 
-        # Right Pane: Live Circuit Schematic, IC Pinout & HEX Memory Inspector
+        # Right pane: illustrative wiring overview, IC pinout, and HEX inspector
         right_wrap = QWidget()
         right_wrap.setObjectName("inspectorPane")
         right_wrap.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -536,7 +536,7 @@ class MainWindow(QMainWindow):
         self.act_save.triggered.connect(self._read_chip)
         m_file.addAction(self.act_save)
 
-        self.act_export_schem = QAction("Export Circuit Schematic…", self)
+        self.act_export_schem = QAction("Export Wiring Overview…", self)
         self.act_export_schem.triggered.connect(self.circuit_panel._export_schematic)
         m_file.addAction(self.act_export_schem)
 
@@ -609,7 +609,7 @@ class MainWindow(QMainWindow):
         m_view.addAction(self.act_log)
 
         m_view.addSeparator()
-        act_t_schem = QAction("Show Circuit Schematic Tab", self)
+        act_t_schem = QAction("Show Wiring Overview Tab", self)
         act_t_schem.setShortcut(QKeySequence("Alt+1"))
         act_t_schem.triggered.connect(lambda: self.circuit_panel.tabs.setCurrentIndex(0))
         m_view.addAction(act_t_schem)
@@ -844,21 +844,20 @@ class MainWindow(QMainWindow):
         if not pw.pinout_verified:
             self._set_guidance(
                 self.lbl_target_guidance,
-                f"Selected: {self.target.display_name}. Pin-level wiring is not verified in this app; "
-                "check the exact manufacturer datasheet before connecting. The host does not expose raw silicon ID.",
+                f"Selected: {self.target.display_name}. Wiring is unverified; check its datasheet before connecting. "
+                "Raw silicon ID is unavailable.",
                 "warn",
             )
         elif not self.target.has_device_id:
             self._set_guidance(
                 self.lbl_target_guidance,
-                f"Selected: {self.target.display_name}. This part has no electronic ID; verify its package marking manually. "
-                "The host does not expose raw silicon ID.",
+                f"Selected: {self.target.display_name}. No electronic ID; verify the package marking manually.",
                 "warn",
             )
         else:
             self._set_guidance(
                 self.lbl_target_guidance,
-                f"Selected: {self.target.display_name}. Query Programmer reports a model; it does not provide raw silicon ID.",
+                f"Selected: {self.target.display_name}. Query Programmer reports a model, not raw silicon ID.",
             )
 
         self.circuit_panel.set_context(
@@ -981,12 +980,12 @@ class MainWindow(QMainWindow):
         elif conn:
             self._set_guidance(
                 self.lbl_connection_guidance,
-                f"Connected on {self.session.state.port}. Target identity and socket voltage are not independently measured by this app.",
+                f"Connected on {self.session.state.port}. Target ID and socket voltage are not measured.",
             )
         elif not has_port:
             self._set_guidance(
                 self.lbl_connection_guidance,
-                "No serial port found. Connect the Arduino by USB, then select Rescan. If ProgramPic is not installed, use Install Firmware.",
+                "No serial port found. Connect the Arduino, then select Rescan. If needed, install ProgramPic firmware.",
                 "warn",
             )
         else:

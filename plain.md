@@ -5,6 +5,19 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 ## Goal and release definition
 
 - Deliver a portable Windows 10/11 x64 package that a user can extract and launch by double-clicking `Arduino-PIC-Programmer.exe`, without installing Python or separately downloading runtime dependencies.
+
+## Current guidance and README circuit update
+
+- [x] Shorten the in-app connection and target guidance while retaining actionable next steps and critical limits (target ID and socket voltage are not measured).
+- [x] Rename the app's generated "Circuit Schematic" view to "Wiring Overview" and label it illustrative, not an electrical schematic.
+- [x] Remove the unsuitable generic supply image and its incorrect resistor/output claims from the README.
+- [x] Replace it with a standard LM317 divider reference: R1=120 Ω OUT-to-ADJ, R2=1.12 kΩ ADJ-to-common, 0.1 µF input bypass, 1 µF output capacitor; clearly label ≈13 V as VPP-only and the drawing as unvalidated.
+- [x] Clarify that the official shield's stated 16–20 V input must not be confused with this independent 24 V reference circuit.
+- [x] Parse the SVG as XML and run diff whitespace checks.
+- [x] Render and visually inspect the circuit SVG; verify feedback resistor/capacitor connections and that labels do not overlap.
+- [ ] Visually inspect real application screenshots. Earlier Windows screenshot artifact downloads ended with EOF; do not mark app visual review complete without opening actual captures.
+- [ ] Bench-validate the supply and programmer hardware before claiming electrical suitability.
+
 - The ZIP/package must include the Qt runtime, ArdPicProg host helper, firmware images, avrdude and its configuration/dependencies/notices, user guide, and required license notices.
 - A GitHub tag, source archive, or temporary Actions artifact is **not** a published release. A real `.exe`/`.zip` must be attached to a non-draft GitHub Release and its direct URL tested signed out.
 - Keep hardware safeguards. Do not publish a fake/stub executable or claim physical validation before it has been performed.
