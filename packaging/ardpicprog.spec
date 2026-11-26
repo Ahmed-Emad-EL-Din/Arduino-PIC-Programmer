@@ -16,19 +16,31 @@ def add_if_present(path: Path, destination: str, datas: list) -> None:
         datas.append((str(path), destination))
 
 
+# Include only runtime data in the portable package. Keep firmware source,
+# development documentation, icon source files, and build helpers in the repo.
 datas = []
-for folder, target in (
-    (ROOT / "firmware", "firmware"),
-    (ROOT / "docs", "docs"),
-    (ROOT / "assets", "assets"),
-    (ROOT / "tools", "tools"),
+for path, destination in (
+    (ROOT / "docs" / "USER_GUIDE.md", "docs"),
+    (ROOT / "assets" / "app-icon.ico", "assets"),
+    (ROOT / "assets" / "reference" / "ArdPicProg_1_8_horo.png", "assets/reference"),
+    (ROOT / "assets" / "reference" / "ArdPicProg.jpg", "assets/reference"),
+    (ROOT / "tools" / "ardpicprog.exe", "tools"),
+    (ROOT / "tools" / "avrdude" / "avrdude.exe", "tools/avrdude"),
+    (ROOT / "tools" / "avrdude" / "avrdude.conf", "tools/avrdude"),
+    (ROOT / "tools" / "avrdude" / "AVRDUDE-LICENSE.txt", "licenses"),
     (ROOT / "vendor" / "ArdPicProg" / "COPYING", "licenses"),
     (ROOT / "vendor" / "ArdPicProg" / "UPSTREAM.md", "licenses"),
     (ROOT / "LICENSE", "licenses"),
     (ROOT / "LGPL-3.0.txt", "licenses"),
     (ROOT / "THIRD_PARTY_NOTICES.md", "licenses"),
 ):
-    add_if_present(folder, target, datas)
+    add_if_present(path, destination, datas)
+
+for path in sorted((ROOT / "firmware" / "precompiled").glob("*.hex")):
+    datas.append((str(path), "firmware/precompiled"))
+
+for path in sorted((ROOT / "tools" / "avrdude").glob("*.dll")):
+    datas.append((str(path), "tools/avrdude"))
 
 hiddenimports = [
     "serial",
