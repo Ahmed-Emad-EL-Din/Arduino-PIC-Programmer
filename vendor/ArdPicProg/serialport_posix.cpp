@@ -97,26 +97,28 @@ bool SerialPort::open(const std::string &deviceName, int speed)
         ::ioctl(fd, TIOCMSET, &lines);
     }
 
-    // At this point, the Arduino may auto-reset so we have to wait for
-    // it to come back up again.  Poll the "PROGRAM_PIC_VERSION" command
-    // once a second until we get a response.  Give up after 5 seconds.
-    // To avoid the auto-reset connect a capacitor > 1µF from /Reset to GND.
-    int retry = 5;
+    // USB serial adapters may reset the Arduino when DTR is asserted. Discard
+    // bootloader/reset noise, then give the sketch up to 10 seconds to answer.
+    ::tcflush(fd, TCIOFLUSH);
+    buflen = 0;
+    bufposn = 0;
+    int retry = 10;
+    bool incompatibleVersion = false;
+    std::string reportedVersion;
     int saveTimeout = timeoutSecs;
     timeoutSecs = 1;
     while (retry > 0) {
         write("PROGRAM_PIC_VERSION\n", 20);
         std::string response = readLine();
-        if (!response.empty()) {
-            if (response.find("ProgramPIC 1.") == 0) {
-                // We've found a version 1 sketch, which we can talk to.
-                _quiet || printf("%s\n", response.c_str());
-                break;
-            } else if (response.find("ProgramPIC ") == 0) {
-                // Version 2 or higher sketch - cannot talk to this.
-                retry = 0;
-                break;
-            }
+        if (response.find("ProgramPIC 1.") == 0) {
+            // The legacy ProgramPic 1.x serial protocol is supported.
+            _quiet || printf("%s\n", response.c_str());
+            break;
+        } else if (response.find("ProgramPIC ") == 0) {
+            incompatibleVersion = true;
+            reportedVersion = response;
+            retry = 0;
+            break;
         }
         --retry;
     }
@@ -126,8 +128,16 @@ bool SerialPort::open(const std::string &deviceName, int speed)
     ::tcsetattr(fd, TCSANOW, &prevParams);
     ::close(fd);
     fd = -1;
-    fprintf(stderr, "%s: did not find a compatible PIC programmer\n",
-            deviceName.c_str());
+    if (incompatibleVersion) {
+        fprintf(stderr, "%s: found %s, but this host requires ProgramPIC 1.x firmware.\n",
+                deviceName.c_str(), reportedVersion.c_str());
+    } else {
+        fprintf(stderr,
+                "%s: no ProgramPic response after 10 seconds at %d baud. "
+                "Install ProgramPic firmware, check the serial port and bootloader, "
+                "use 115200 baud, and close other serial tools.\n",
+                deviceName.c_str(), speed);
+    }
     return false;
 }
 

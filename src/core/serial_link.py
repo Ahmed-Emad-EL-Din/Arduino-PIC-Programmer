@@ -22,7 +22,10 @@ class SerialPortInfo:
     @property
     def is_likely_arduino(self) -> bool:
         text = f"{self.description} {self.hwid}".casefold()
-        return any(token in text for token in ("arduino", "ch340", "wchusb", "usb serial"))
+        known_wch_vid = "vid:pid=1a86:" in text or "vid_1a86&pid_" in text
+        return known_wch_vid or any(
+            token in text for token in ("arduino", "ch340", "wchusb", "usb serial")
+        )
 
     def label(self) -> str:
         return f"{self.device} — {self.description}" if self.description else self.device

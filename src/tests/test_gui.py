@@ -48,6 +48,16 @@ class TestGUIIntegration(unittest.TestCase):
     def tearDown(self):
         self.win.close()
 
+    def test_ch340_handshake_failure_has_actionable_firmware_guidance(self):
+        message = MainWindow._actionable_operation_error(
+            "Connect Programmer",
+            "COM4: no ProgramPic response after 10 seconds at 115200 baud.",
+        )
+        self.assertIn("Install Firmware", message)
+        self.assertIn("matching new/old bootloader", message)
+        self.assertIn("CH340/CH341", message)
+        self.assertIn("115200", message)
+
     def test_main_window_initialization(self):
         self.assertEqual(self.win.settings.theme, "dark")
         self.assertFalse(self.win.brand_icon.pixmap().isNull())

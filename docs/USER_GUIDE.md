@@ -83,6 +83,7 @@ The app must not be considered production-ready until Windows and physical-devic
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
+| “No ProgramPic response” / “did not find a compatible PIC programmer” | ProgramPic not uploaded, wrong Nano bootloader/COM port/baud, or serial port busy | CH340/CH341 clones use their normal `COMx` port. Choose **Install Firmware…** and the matching Nano bootloader, keep 115200 baud, close Serial Monitor, then reconnect. If no COM port appears, install the WCH CH340/CH341 driver and rescan. |
 | “No response from the Arduino” | Wrong port / firmware missing / Serial Monitor open | Rescan ports, flash firmware, close Serial Monitor |
 | “avrdude failed — not in sync” | Wrong board variant or port | Try Nano *Old Bootloader*; press reset and retry |
 | `DEVICE failed` | Empty socket, VPP off, chip backwards | Check red VPP LED, pin-1 orientation, lever |
