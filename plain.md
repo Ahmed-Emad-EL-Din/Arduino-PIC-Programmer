@@ -159,7 +159,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 
 - `python -m compileall -q src app`: passed after the current UX changes.
 - `PYTHONPATH=src .venv/bin/python -m pytest -q src/tests/test_ihex.py src/tests/test_programmer_adapter.py src/tests/test_svg.py src/tests/test_safety.py`: **18 passed** locally.
-- Current GUI integration tests cannot run in this Linux sandbox: PySide6 imports fail because system `libGL.so.1` is absent. Windows run `45806778512` caught two stale assertions (the inspector image fits but warns about omitted config, and the disabled Query tooltip hid its raw-ID caveat). Both expectations/copy were corrected; the follow-up Windows run is the remaining gate for these changes.
+- Current GUI integration tests cannot run in this Linux sandbox: PySide6 imports fail because system `libGL.so.1` is absent. Windows run `45806778512` caught two stale assertions (the inspector image fits but warns about omitted config, and the disabled Query tooltip hid its raw-ID caveat). Run `45807183480` then caught only a tooltip capitalization mismatch; that wording now matches the regression assertion. A final Windows rerun is pending.
 - `bash packaging/build_host_posix.sh`: built the upstream C++ helper into ignored `tools/ardpicprog`; CLI help smoke test passed.
 - `git diff --check`: passed on the current changes.
 - PyInstaller spec path was corrected after an initial failed attempt. A Linux packaging attempt is still blocked because the sandbox Python lacks `libpython3.11.so.1.0`; this is not a Windows build result.
