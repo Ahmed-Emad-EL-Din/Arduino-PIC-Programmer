@@ -2,7 +2,7 @@
 
 ## Windows build status
 
-**Installable Windows package:** after this branch's updated Windows workflow passes, open the [Windows desktop package workflow](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/workflows/build-windows.yml), select that successful run, and download **Arduino-PIC-Programmer-Windows-x64-candidate**. The previously passing workflow run predates installer packaging and does not contain a setup executable. Extract GitHub's outer artifact ZIP. The updated artifact will contain an installer, the portable ZIP, and a SHA-256 sidecar for each. Verify the installer before running it:
+**Recommended: install the app.** After the updated Windows workflow passes, open the [Windows desktop package workflow](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/workflows/build-windows.yml), select the successful run, and download **Arduino-PIC-Programmer-Windows-x64-installer**. Extract that artifact ZIP; it contains the setup executable and its `.sha256` sidecar. Verify before installing:
 
 ```powershell
 $setup = 'Arduino-PIC-Programmer-Setup-x64.exe'
@@ -11,17 +11,19 @@ $actual = (Get-FileHash -Path $setup -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actual -ne $expected) { throw 'SHA-256 mismatch; do not install this file.' }
 ```
 
-The installer performs a per-user install, adds a Start menu shortcut, and registers an uninstaller; it does not require administrator rights. The portable ZIP remains available as an alternative and contains only the app executable plus its required `_internal` runtime bundle—no source tree, firmware source, build tools, or CI reports. Keep `_internal` beside the EXE when extracting it. The same run also uploads short-lived real UI screenshots for review.
+Run Setup for a normal per-user installation—no administrator rights required. It creates a Start menu shortcut, registers the app with Windows Installed Apps/Apps & Features, provides an uninstaller, and can create an optional desktop shortcut. It uses the app's branded icon. The portable build is a separate optional artifact, **Arduino-PIC-Programmer-Windows-x64-portable**, so most users need not download a second copy of the app.
 
-These will be temporary Actions artifacts (14-day retention; GitHub sign-in/repository access may be required), **not a published GitHub Release**. If they expire, run the workflow manually for the desired branch.
+The portable ZIP uses maximum Deflate compression and contains only `Arduino-PIC-Programmer.exe` plus the required `_internal` runtime bundle. It excludes source code, firmware source, development files, generated caches/debug symbols, and CI reports. Keep `_internal` beside the EXE when extracting it.
+
+Artifacts are temporary (14-day retention; GitHub sign-in/repository access may be required), **not published GitHub Releases**. The updated installer/compression workflow is awaiting its next CI run; earlier successful runs may not have the separate artifact names described above.
 
 ### Why Windows may show “Windows protected your PC”
 
-That dialog is Microsoft Defender SmartScreen's **publisher/file-reputation** warning. It commonly appears for a new, unsigned download; it is not by itself a malware detection. Packaging the EXE inside an installer or ZIP does not remove the warning. This workflow signs the app binaries and installer only for version-tag builds when a trusted Authenticode certificate is configured through protected GitHub Actions secrets. Without that signing setup, the candidate is unsigned and SmartScreen may warn. Even a valid signature does not guarantee an immediate warning-free first release: reputation builds over time, and EV certificates no longer bypass SmartScreen. Microsoft identifies Microsoft Store distribution as the reliable way to avoid SmartScreen download warnings; that distribution path is not set up for this project yet. See [Microsoft's SmartScreen guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation).
+That dialog is Microsoft Defender SmartScreen's **publisher/file-reputation** warning. It commonly appears for a new, unsigned download; it is not by itself a malware detection. Packaging the EXE inside an installer or ZIP does not remove the warning. This workflow signs app binaries and the installer only for version-tag builds when a trusted Authenticode certificate is configured through protected GitHub Actions secrets. Without that setup, the installer is unsigned and SmartScreen may warn. Even a valid signature does not guarantee an immediate warning-free first release: reputation builds over time, and EV certificates no longer bypass SmartScreen. Microsoft identifies Microsoft Store distribution as the reliable way to avoid SmartScreen download warnings; that distribution path is not set up for this project yet. See [Microsoft's SmartScreen guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation).
 
-Do not disable SmartScreen or bypass its warning for this unvalidated candidate. Verify the source and SHA-256; wait for a signed, hardware-validated release before installing it for programming work.
+Do not disable SmartScreen or bypass its warning for an unvalidated candidate. Verify the source and SHA-256; wait for a signed, hardware-validated release before installing it for programming work.
 
-**Not yet a validated release:** the updated installer workflow has not run yet. Once it does, it will build and smoke-test the installer, but that still will not replace clean-PC testing or physical programmer hardware validation. Do not use this candidate for destructive programming until the Windows and hardware acceptance steps below pass. The [Releases page](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases) does not yet contain a validated downloadable release.
+**Not yet a validated hardware release:** Windows CI smoke-tests installation, launch, and uninstall without hardware. That does not replace testing on a clean Windows PC or physical programmer hardware. Do not use an unvalidated candidate for destructive programming. The [Releases page](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases) does not yet contain a validated downloadable release.
 
 **Made By:** Ahmed Emad El-Din Hussein · [https://github.com/Ahmed-Emad-EL-Din](https://github.com/Ahmed-Emad-EL-Din)
 

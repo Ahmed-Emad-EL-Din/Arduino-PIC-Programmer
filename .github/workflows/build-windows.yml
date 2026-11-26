@@ -294,6 +294,17 @@ jobs:
           if (!(Test-Path $InstalledExe) -or !(Test-Path (Join-Path $InstallDir '_internal/tools/ardpicprog.exe'))) {
             throw 'Installer did not place the application and host helper.'
           }
+          $StartMenu = Join-Path $env:APPDATA 'Microsoft/Windows/Start Menu/Programs/Arduino-PIC Programmer.lnk'
+          if (!(Test-Path $StartMenu)) { throw 'Installer did not create the Start menu application shortcut.' }
+          $UninstallRoot = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
+          $InstalledEntry = Get-ChildItem $UninstallRoot -ErrorAction Stop |
+            ForEach-Object { Get-ItemProperty $_.PSPath } |
+            Where-Object { $_.DisplayName -eq 'Arduino-PIC Programmer' } |
+            Select-Object -First 1
+          if (!$InstalledEntry) { throw 'Installer did not register in Windows Installed Apps.' }
+          if ($InstalledEntry.DisplayVersion -ne '2.1.0' -or $InstalledEntry.DisplayIcon -notlike '*Arduino-PIC-Programmer.exe*') {
+            throw 'Installed Apps entry is missing the app version or branded app icon.'
+          }
           $env:QT_QPA_PLATFORM = 'offscreen'
           $App = Start-Process -FilePath $InstalledExe -PassThru
           try {
@@ -312,19 +323,20 @@ jobs:
           ) -Wait -PassThru
           if ($Removal.ExitCode -ne 0) { throw "Uninstaller exited with code $($Removal.ExitCode)." }
           if (Test-Path $InstalledExe) { throw 'Uninstaller left the application executable behind.' }
-          'Per-user install, no-hardware launch, and uninstall smoke test passed.' | Add-Content $env:GITHUB_STEP_SUMMARY
+          if (Test-Path $StartMenu) { throw 'Uninstaller left the Start menu shortcut behind.' }
+          $RemainingEntry = Get-ChildItem $UninstallRoot -ErrorAction SilentlyContinue |
+            ForEach-Object { Get-ItemProperty $_.PSPath } |
+            Where-Object { $_.DisplayName -eq 'Arduino-PIC Programmer' }
+          if ($RemainingEntry) { throw 'Uninstaller left the app registered in Windows Installed Apps.' }
+          'Per-user install, Start menu registration, no-hardware launch, and complete uninstall smoke test passed.' | Add-Content $env:GITHUB_STEP_SUMMARY
 
-      - name: Create portable ZIP and setup SHA-256 checksums
+      - name: Create compact portable ZIP and setup SHA-256 checksums
         shell: pwsh
         run: |
           $Package = 'dist/Arduino-PIC-Programmer'
-          $TopLevel = @(Get-ChildItem $Package -Force | ForEach-Object { $_.Name } | Sort-Object)
-          $ExpectedTopLevel = @('_internal', 'Arduino-PIC-Programmer.exe') | Sort-Object
-          if (Compare-Object $ExpectedTopLevel $TopLevel) {
-            throw "Portable package root contains unexpected files. Expected only the app executable and its runtime folder; found: $($TopLevel -join ', ')"
-          }
           $Zip = 'dist/Arduino-PIC-Programmer-Windows-x64.zip'
-          Compress-Archive -Path "$Package/*" -DestinationPath $Zip -Force
+          python packaging/create_portable_zip.py --source $Package --output $Zip
+          if ($LASTEXITCODE -ne 0) { throw 'Compact portable ZIP creation/validation failed.' }
           $ZipHash = (Get-FileHash -Path $Zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$ZipHash  Arduino-PIC-Programmer-Windows-x64.zip" | Set-Content -Path "$Zip.sha256" -Encoding ascii
           $ZipWrittenHash = ((Get-Content -Path "$Zip.sha256" -Raw).Trim() -split ' +')[0]
@@ -337,14 +349,22 @@ jobs:
           Copy-Item -Path $SetupFile -Destination 'dist/Arduino-PIC-Programmer-Setup-x64.exe'
           Copy-Item -Path "$SetupFile.sha256" -Destination 'dist/Arduino-PIC-Programmer-Setup-x64.exe.sha256'
 
-      - name: Upload candidate build artifact
+      - name: Upload Windows installer
         uses: actions/upload-artifact@v7
         with:
-          name: Arduino-PIC-Programmer-Windows-x64-candidate
+          name: Arduino-PIC-Programmer-Windows-x64-installer
+          path: |
+            dist/Arduino-PIC-Programmer-Setup-x64.exe
+            dist/Arduino-PIC-Programmer-Setup-x64.exe.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload optional portable ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          name: Arduino-PIC-Programmer-Windows-x64-portable
           path: |
             dist/Arduino-PIC-Programmer-Windows-x64.zip
             dist/Arduino-PIC-Programmer-Windows-x64.zip.sha256
-            dist/Arduino-PIC-Programmer-Setup-x64.exe
-            dist/Arduino-PIC-Programmer-Setup-x64.exe.sha256
           if-no-files-found: error
           retention-days: 14

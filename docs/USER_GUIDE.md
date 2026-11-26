@@ -28,9 +28,9 @@ Follow the reference circuit (official Ho-Ro schematic):
 ## 2. First-time setup (once)
 
 ### Step 1 — Install the Windows candidate
-1. After the updated Windows workflow succeeds, open that run from the README's workflow link and download its candidate artifact. Earlier successful runs do not include the installer.
-2. Extract GitHub's outer ZIP. Verify `Arduino-PIC-Programmer-Setup-x64.exe` against its `.sha256` sidecar before installing.
-3. Run Setup. It installs per-user, adds a Start menu shortcut, and registers an uninstaller. This is still a temporary candidate—not a validated release.
+1. After the updated Windows workflow succeeds, open that run from the README's workflow link and download **Arduino-PIC-Programmer-Windows-x64-installer**. Earlier runs may use the old combined artifact name.
+2. Extract the artifact ZIP. Verify `Arduino-PIC-Programmer-Setup-x64.exe` against its `.sha256` sidecar before installing.
+3. Run Setup. It installs per-user, adds a Start menu shortcut, registers in Windows Installed Apps, and includes an uninstaller. This is still a temporary candidate—not a validated hardware release.
 4. SmartScreen can warn on unsigned or not-yet-reputed apps. Do not disable it or bypass it for an unvalidated candidate; see the README's SmartScreen note.
 
 ### Step 2 — Install ProgramPic firmware if needed
