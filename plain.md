@@ -51,9 +51,9 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [x] Create/restore the app entry point, persistent settings, dialogs, theme, icons, and worker lane required by the workbench.
 - [x] Add test coverage for HEX parsing, backend adapter results, and SVG validity.
 - [x] Add real Qt window screenshot capture for dark/light home screens and the HEX inspector; add an Actions artifact upload step for review.
-- [x] Run the screenshot-enabled GUI integration suite on Windows after the previous copy/confirmation changes; that workflow passed in Actions run `45761718540`.
-- [x] Generate real-app screenshots for dark/light no-hardware home and the HEX inspector in that run. The current UX refinements still need a new Windows screenshot run.
-- [ ] Visually inspect those real-app images for clipping, unreadable text, spacing, and misleading states. The Actions artifact download currently fails with an EOF while fetching its signed archive; visual sign-off remains pending.
+- [x] Run the screenshot-enabled GUI integration suite on Windows after the current UX refinements; the final workflow passed in Actions run `45807577569`.
+- [x] Generate fresh real-app screenshots for dark/light no-hardware home and the HEX inspector; artifact `Arduino-PIC-Programmer-UI-screenshots` is attached to that run.
+- [ ] Visually inspect those images for clipping, unreadable text, spacing, and misleading states. Downloading the signed artifact archive still fails with EOF; visual sign-off remains pending.
 - [ ] Test startup without hardware, settings file, or recent files; test corrupt settings and unavailable COM ports.
 - [ ] Test file open/drag-drop/save, recent files, preflight dismissal/acceptance, settings persistence, cancellation, and clean shutdown.
 - [ ] Test the UI at common Windows DPI scales and resolutions; ensure dialogs/buttons/text remain visible.
@@ -100,9 +100,8 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [ ] Standardize terminology, button verbs, status colors/icons, spacing, and dialog button order; remove jargon or define it at first use.
 
 ### Real-image review / visual regression
-- [x] Capture real Qt app windows (not mockups): dark no-hardware home, light no-hardware home, and dark HEX inspector. Previous screenshots are in the [Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45761718540), artifact `Arduino-PIC-Programmer-UI-screenshots`.
-- [ ] Retrieve and inspect the previous Windows captures at 100% and enlarged; `gh run download` currently receives EOF from the signed artifact host.
-- [ ] Capture and inspect fresh images after the current inline-guidance/theme changes; latest code has not yet run in Windows CI.
+- [x] Capture real Qt app windows (not mockups): dark no-hardware home, light no-hardware home, and dark HEX inspector. Fresh screenshots are in the [passing Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45807577569), artifact `Arduino-PIC-Programmer-UI-screenshots`.
+- [ ] Download and inspect the fresh Windows captures at 100% and enlarged. `gh run download` currently receives EOF from the signed artifact host.
 - [ ] Keep screenshots as a short-lived CI artifact unless approved documentation images are deliberately curated; don't commit raw build/test output accidentally.
 - [ ] Acceptance: a first-time user can identify the next safe step, understand what the app knows versus what it cannot measure, and recover from common errors without guessing.
 
@@ -133,7 +132,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 
 ## Phase 5.5 — Product trust, support, and final QA
 
-- [ ] Review actual UI screenshots from the previous Windows run (artifact download currently ends with EOF), then capture fresh dark/light and HEX-inspector screenshots after the current changes; review clipping, spacing, text legibility, and hardware-state claims.
+- [ ] Review actual UI screenshots from passing Windows run `45807577569` (artifact download currently ends with EOF); review clipping, spacing, text legibility, and hardware-state claims.
 - [ ] Verify empty/no-hardware, disconnected, loading, failure, success, and destructive-confirmation UI states; ensure errors are actionable and success is never reported prematurely.
 - [ ] Review keyboard navigation, accessible names/focus order, high-DPI scaling, minimum window size, and common 100%/150%/200% Windows display scales.
 - [ ] Verify app branding: final product name/version, executable metadata/icon, support URL, About dialog, and no development suffix in a release build.
@@ -159,15 +158,15 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 
 - `python -m compileall -q src app`: passed after the current UX changes.
 - `PYTHONPATH=src .venv/bin/python -m pytest -q src/tests/test_ihex.py src/tests/test_programmer_adapter.py src/tests/test_svg.py src/tests/test_safety.py`: **18 passed** locally.
-- Current GUI integration tests cannot run in this Linux sandbox: PySide6 imports fail because system `libGL.so.1` is absent. Windows run `45806778512` caught two stale assertions (the inspector image fits but warns about omitted config, and the disabled Query tooltip hid its raw-ID caveat). Run `45807183480` then caught only a tooltip capitalization mismatch; that wording now matches the regression assertion. A final Windows rerun is pending.
+- Current GUI integration tests cannot run in this Linux sandbox: PySide6 imports fail because system `libGL.so.1` is absent. Windows run `45806778512` caught two stale assertions; run `45807183480` caught a tooltip capitalization mismatch. All are fixed, and final run `45807577569` passes the full screenshot-enabled test suite and Windows packaging workflow.
 - `bash packaging/build_host_posix.sh`: built the upstream C++ helper into ignored `tools/ardpicprog`; CLI help smoke test passed.
 - `git diff --check`: passed on the current changes.
 - PyInstaller spec path was corrected after an initial failed attempt. A Linux packaging attempt is still blocked because the sandbox Python lacks `libpython3.11.so.1.0`; this is not a Windows build result.
-- Windows CI passed for commit `f7638be` in Actions run `45761718540`; it produced the candidate ZIP, CI-checked SHA-256 sidecar, JUnit test report, and fresh UI screenshots. These are temporary Actions artifacts, not a published Release. No clean-machine Windows launch or physical hardware test has been performed.
+- Latest Windows CI passed for commit `302f86d` in Actions run `45807577569`; it produced a candidate ZIP, SHA-256 sidecar, test report, and fresh UI screenshots. These are temporary Actions artifacts, not a published Release. No clean-machine Windows launch or physical hardware test has been performed.
 
 ## Remaining release blockers
 
-- [x] Previously run the Windows build/test workflow after the copy/safety pass (run `45761718540`); the newer inline-guidance, mismatch-gating, and theme changes still need Windows CI.
+- [x] Run the Windows build/test workflow after inline-guidance, mismatch-gating, theme, and regression-test changes (run `45807577569`).
 - [ ] Physically validate the adapter and safety behavior with supported hardware.
 - [ ] Publish and test a real GitHub Release asset.
 
