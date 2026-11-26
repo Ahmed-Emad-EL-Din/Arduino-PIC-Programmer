@@ -5,9 +5,9 @@
 
 ---
 
-## Status: source/build candidate, not a validated release
+## Status: candidate build, not a validated release
 
-There is no downloadable Windows executable yet. The Windows workflow has not completed in this project, and no physical hardware validation has been performed. Treat the UI/workflow descriptions below as intended candidate behavior, not as a guarantee that programming is ready for use. Do not perform destructive programming with an unvalidated build.
+The Windows workflow has passed and produced a temporary candidate artifact; see the README for the current download link and expiry details. No validated GitHub Release or physical hardware acceptance is available yet. Treat these steps as candidate behavior, not proof that programming is ready for use; do not perform destructive programming with an unvalidated build.
 
 ## 1. Hardware you need
 
@@ -19,7 +19,7 @@ Follow the reference circuit (official Ho-Ro schematic):
   — or the equivalent wiring:
   * **D2 → VDD**, **D3 → MCLR/VPP**, **D4 → CLK**, **D5 → DATA**
     (ProgramPic v1.8.horo pinout)
-  * External **16–20 V** input for the 13 V VPP rail (red LED = VPP OK)
+  * The official shield's documented **16–20 V** VPP input (red LED = VPP OK). Do not substitute a 24 V source unless the exact hardware documentation permits it.
 * The target PIC (e.g. PIC16F84A) in the ZIF socket, pin 1 aligned,
   lever locked
 * Jumper **JP3**: position 1-2 for 18-pin chips (PIC16F84A),
@@ -34,7 +34,7 @@ Follow the reference circuit (official Ho-Ro schematic):
 3. Press **Flash Firmware** and confirm. Keep USB connected.
    * If Nano upload fails, select the *Old Bootloader* variant.
    * Leonardo/Micro firmware upload is not implemented in the app yet because these boards re-enumerate their bootloader COM port; use Arduino IDE for that upload flow.
-4. The source pipeline includes a Windows script that compiles supported board firmware and stages `avrdude` for packaging. This pipeline has not yet been validated on Windows and does not provide a downloadable application today.
+4. The Windows workflow compiles supported board firmware and packages `avrdude`; it has passed CI. The temporary candidate is not a published release—see the README. Leonardo/Micro still require Arduino IDE for firmware upload.
 
 ### Step 2 — Connect & verify
 1. Home page **Step 2 → Connect** (or `Ctrl+P`).

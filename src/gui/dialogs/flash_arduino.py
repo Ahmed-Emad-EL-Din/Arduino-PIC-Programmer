@@ -36,6 +36,10 @@ class FlashArduinoDialog(QDialog):
         form.addRow("Port:", self.port)
         form.addRow("", self.rescan)
         layout.addLayout(form)
+        self.board_note = QLabel()
+        self.board_note.setObjectName("warn")
+        self.board_note.setWordWrap(True)
+        layout.addWidget(self.board_note)
         self.status = QLabel("")
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
@@ -45,7 +49,26 @@ class FlashArduinoDialog(QDialog):
         buttons.rejected.connect(self.reject)
         buttons.button(QDialogButtonBox.StandardButton.Close).clicked.connect(self.reject)
         layout.addWidget(buttons)
+        self.board.currentIndexChanged.connect(self._update_board_support)
+        self._update_board_support()
         self._rescan()
+
+    def _update_board_support(self) -> None:
+        board = BOARD_BY_KEY.get(str(self.board.currentData() or ""))
+        supported = bool(board and board.firmware_flash_supported)
+        if board and not supported:
+            self.board_note.setText(
+                f"Firmware upload for {board.label} is not supported in this dialog. "
+                "Use Arduino IDE to install ProgramPic; the board can still run it afterward."
+            )
+            self.board_note.show()
+            self.flash_button.setEnabled(False)
+            self.flash_button.setToolTip("Use Arduino IDE for Leonardo/Micro firmware upload.")
+        else:
+            self.board_note.clear()
+            self.board_note.hide()
+            self.flash_button.setEnabled(True)
+            self.flash_button.setToolTip("")
 
     def _rescan(self) -> None:
         previous = self.settings.port

@@ -1,9 +1,8 @@
-"""Interactive Hardware Circuit, Pinout, HEX Memory & Reference Inspector.
+"""Interactive wiring overview, pinout, HEX memory, and hardware reference.
 
-Provides the live right-hand engineering workbench panel (`CircuitPanel`):
-  1. **Circuit Schematic** — Dynamic IEEE/IEC vector schematic (`schemdraw` SVG)
-     tailored to the exact `(Arduino board, Target PIC MCU)` pair, with smooth
-     zoom, pan, Reset View, and Save SVG / PNG export.
+Provides the live right-hand workbench panel (`CircuitPanel`):
+  1. **Wiring Overview** — Illustrative vector overview tailored to the selected
+     Arduino board and PIC, with zoom, pan, reset, and SVG / PNG export.
   2. **IC Pinout & ZIF Seating** — Scale-proportioned PDIP package diagram with
      Pin-1 notch, color-coded ICSP badges, ZIF-18 slot placement / JP3 jumper
      guide, and a structured pin-by-pin wiring table.
@@ -200,7 +199,7 @@ class _SvgCanvas(QWidget):
 
 
 class CircuitPanel(QWidget):
-    """Live Hardware Wiring, Schematic, Pinout & HEX Memory Inspector."""
+    """Live wiring overview, pinout, hardware reference, and HEX inspector."""
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -244,7 +243,7 @@ class CircuitPanel(QWidget):
         self.tabs.setObjectName("inspectorTabs")
         root.addWidget(self.tabs, 1)
 
-        # Tab 1: Dynamic Circuit Schematic
+        # Tab 1: Illustrative wiring overview
         self._build_schematic_tab()
         # Tab 2: IC Pinout & Wiring Table
         self._build_pinout_tab()
@@ -267,7 +266,7 @@ class CircuitPanel(QWidget):
         bar = QHBoxLayout()
         bar.setSpacing(6)
         self.schem_caption = QLabel(
-            "IEEE standard vector schematic — auto-configured for selected Arduino & PIC"
+            "Illustrative wiring overview — verify connections against the board and PIC datasheets"
         )
         self.schem_caption.setObjectName("muted")
         bar.addWidget(self.schem_caption, 1)
@@ -301,7 +300,7 @@ class CircuitPanel(QWidget):
         self.safety_foot.setWordWrap(True)
         lay.addWidget(self.safety_foot)
 
-        self.tabs.addTab(page, "Circuit Schematic")
+        self.tabs.addTab(page, "Wiring Overview")
 
     def _build_pinout_tab(self) -> None:
         page = QWidget()
@@ -649,10 +648,10 @@ class CircuitPanel(QWidget):
         self.hex_dump.setPlainText("\n".join(dump_lines))
 
     def _export_schematic(self) -> None:
-        default_name = f"schematic_{self._board_key}_{self._mcu_name}.svg"
+        default_name = f"wiring_overview_{self._board_key}_{self._mcu_name}.svg"
         path, flt = QFileDialog.getSaveFileName(
             self,
-            "Export Circuit Schematic",
+            "Export Wiring Overview",
             default_name,
             "SVG Vector (*.svg);;PNG High-DPI Image (*.png)",
         )

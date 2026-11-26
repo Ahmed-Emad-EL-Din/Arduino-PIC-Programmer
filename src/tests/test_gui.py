@@ -64,6 +64,13 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertFalse(self.win.target_tools_panel.isVisible())
         capture_window(self.win, "main-dark-no-hardware.png")
 
+    def test_busy_serial_port_error_has_recovery_steps(self):
+        message = MainWindow._actionable_operation_error(
+            "Connect Programmer", "ser_open(): can't open device COM5: Access is denied."
+        )
+        self.assertIn("Close Arduino Serial Monitor", message)
+        self.assertIn("select Rescan", message)
+
     def test_connection_controls_follow_connection_state(self):
         self.win.session.state.verified = True
         self.win.session.state.port = "COM1"
@@ -138,6 +145,18 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertFalse(self.win.btn_program.isEnabled())
         self.assertTrue(self.win.btn_detect.isEnabled())
         self.assertIn("Blocked:", self.win.lbl_target_guidance.text())
+
+    def test_flash_dialog_explains_unsupported_bootloader_uploads(self):
+        dlg_flash = FlashArduinoDialog(self.win.settings, self.win.lane, self.win)
+        dlg_flash.board.setCurrentIndex(dlg_flash.board.findData("uno"))
+        self.assertTrue(dlg_flash.flash_button.isEnabled())
+        dlg_flash.board.setCurrentIndex(dlg_flash.board.findData("leonardo"))
+        self.assertFalse(dlg_flash.flash_button.isEnabled())
+        self.assertIn("Use Arduino IDE", dlg_flash.board_note.text())
+        dlg_flash.board.setCurrentIndex(dlg_flash.board.findData("uno"))
+        self.assertTrue(dlg_flash.flash_button.isEnabled())
+        self.assertTrue(dlg_flash.board_note.isHidden())
+        dlg_flash.close()
 
     def test_dialogs_instantiation(self):
         dlg_flash = FlashArduinoDialog(self.win.settings, self.win.lane, self.win)
