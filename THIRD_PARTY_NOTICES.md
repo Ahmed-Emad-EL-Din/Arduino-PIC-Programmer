@@ -2,7 +2,7 @@
 
 The portable Windows package includes or is built with third-party components. Their licenses remain applicable; this notice does not replace the license texts delivered with the package.
 
-- **ArdPicProg host and ProgramPic firmware** — Ho-Ro / Southern Storm Software, GPL-3.0. Source is included under `vendor/ArdPicProg/` and `firmware/source/`; see `LICENSE` and `vendor/ArdPicProg/UPSTREAM.md`.
+- **ArdPicProg host and ProgramPic firmware** — Ho-Ro / Southern Storm Software, GPL-3.0. The corresponding source is maintained in this repository under `vendor/ArdPicProg/` and `firmware/source/`; the Windows package contains the built host/firmware runtime files. See `LICENSE` and `vendor/ArdPicProg/UPSTREAM.md`.
 - **PySide6 / Qt 6** — LGPL-3.0-or-later or GPL/commercial terms depending on the component and use. `LGPL-3.0.txt` is included. The package must preserve Qt's notices and allow replacement of the dynamically linked Qt libraries.
 - **pyserial** — BSD-3-Clause; project: <https://github.com/pyserial/pyserial>.
 - **PyInstaller** — GPL with the PyInstaller bootloader exception; project: <https://github.com/pyinstaller/pyinstaller>.

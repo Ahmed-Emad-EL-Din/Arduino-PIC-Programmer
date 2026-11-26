@@ -109,7 +109,6 @@ jobs:
             "$Internal/assets/reference/ArdPicProg_1_8_horo.png",
             "$Internal/assets/reference/ArdPicProg.jpg",
             "$Internal/assets/app-icon.ico",
-            "$Internal/licenses/AVRDUDE-LICENSE.txt",
             "$Internal/licenses/LICENSE",
             "$Internal/licenses/LGPL-3.0.txt",
             "$Internal/licenses/THIRD_PARTY_NOTICES.md",
