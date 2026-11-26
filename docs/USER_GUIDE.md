@@ -92,6 +92,8 @@ The app must not be considered production-ready until Windows and physical-devic
 | Port busy / access denied | Another program using the port | Close MPLAB/QPICkit/Serial Monitor |
 | HEX “outside memory map” | HEX from a different MCU | Load the HEX built for your selected target |
 
+For an unexpected operation error, use **Copy details** in the error dialog and share that text along with the exported Activity Log. The full rotating diagnostic log is saved at the path shown in the error dialog (up to 2 MB per file, with three backups). If a hardware operation is active when you close the app, the app requests cancellation and stays open until the serial host exits safely; do not force-terminate it while it is writing to a PIC.
+
 ## 7. Safety notes
 
 * The 13 V VPP supply must never be plugged into the Arduino power jack.

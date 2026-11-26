@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from app.diagnostics import report_exception, show_diagnostic_error
 from core.avrdude import BOARDS, BOARD_BY_KEY, flash_firmware
 from core.serial_link import LinkError, list_serial_ports
 from gui.workers import Worker
@@ -138,11 +139,17 @@ class FlashArduinoDialog(QDialog):
             self.status.setText(message)
 
     def _on_upload_succeeded(self, output) -> None:
-        self._upload_succeeded = True
         self._upload_output = str(output or "")
-        self.settings.board_key = self._upload_board_key
-        self.settings.port = self._upload_port
-        self.settings.sync()
+        try:
+            self.settings.board_key = self._upload_board_key
+            self.settings.port = self._upload_port
+            self.settings.sync()
+        except Exception as exc:
+            self._upload_error = report_exception("Saving firmware upload settings", exc)
+            self.status.setText(self._output_excerpt(self._upload_error))
+            return
+
+        self._upload_succeeded = True
         self.status.setText(
             f"Firmware upload completed for {self._upload_board_label} on {self._upload_port}."
         )
@@ -156,10 +163,11 @@ class FlashArduinoDialog(QDialog):
         self._worker = None
         self._set_uploading(False)
         if self._upload_error:
-            QMessageBox.critical(
+            show_diagnostic_error(
                 self,
                 "Firmware upload failed",
                 self._output_excerpt(self._upload_error),
+                critical=True,
             )
         elif self._upload_succeeded:
             summary = (
@@ -231,10 +239,13 @@ class FlashArduinoDialog(QDialog):
                 worker.start()
         except RuntimeError as exc:
             self._worker = None
-            self._upload_error = str(exc)
+            self._upload_error = report_exception("Starting firmware upload", exc)
+            worker.deleteLater()
             self._set_uploading(False)
             self.status.setText(self._upload_error)
-            QMessageBox.critical(self, "Firmware upload failed", self._upload_error)
+            show_diagnostic_error(
+                self, "Firmware upload failed", self._upload_error, critical=True
+            )
 
     def reject(self) -> None:
         if self._worker is not None and self._worker.isRunning():

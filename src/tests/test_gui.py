@@ -198,6 +198,49 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertEqual(self.win.btn_detect.objectName(), "primary")
         self.assertIn("Blocked:", self.win.lbl_target_guidance.text())
 
+    def test_close_defers_until_active_hardware_worker_exits(self):
+        started = threading.Event()
+        release_worker = threading.Event()
+
+        def blocking_operation(_progress, _percent, _cancel):
+            started.set()
+            release_worker.wait(timeout=3)
+            return "finished safely"
+
+        with patch("gui.main_window.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
+            self.win._run_task(blocking_operation, lambda _result: None, "Test hardware operation")
+            worker = self.win.lane.current
+            self.assertIsNotNone(worker)
+            self.assertTrue(started.wait(timeout=1))
+            self.win.close()
+            self.assertTrue(self.win._closing_after_operation)
+            self.assertTrue(self.win.isVisible())
+            release_worker.set()
+            self.assertTrue(worker.wait(5000))
+            QApplication.processEvents()
+
+        self.assertFalse(self.win._closing_after_operation)
+        self.assertFalse(self.win.lane.busy)
+        self.assertFalse(self.win.isVisible())
+
+    def test_worker_error_is_diagnostic_and_restores_ui_state(self):
+        def fail_operation(_progress, _percent, _cancel):
+            raise RuntimeError("simulated serial failure")
+
+        with patch("gui.main_window.show_diagnostic_error"):
+            self.win._run_task(fail_operation, lambda _result: None, "Test operation")
+            worker = self.win.lane.current
+            self.assertIsNotNone(worker)
+            self.assertTrue(worker.wait(5000))
+            QApplication.processEvents()
+
+        self.assertFalse(self.win.lane.busy)
+        self.assertFalse(self.win.progress.isVisible())
+        text = self.win.log_pane.text()
+        self.assertIn("simulated serial failure", text)
+        self.assertIn("Diagnostic ID:", text)
+        self.assertIn("Full log:", text)
+
     def test_firmware_upload_runs_off_the_gui_thread_and_keeps_dialog_alive(self):
         dlg_flash = FlashArduinoDialog(self.win.settings, None, self.win)
         dlg_flash.board.setCurrentIndex(dlg_flash.board.findData("nano_new"))

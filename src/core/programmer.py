@@ -114,12 +114,15 @@ class ProgrammerSession:
             process.wait(timeout=timeout)
         except subprocess.TimeoutExpired as exc:
             # Do not claim that an interrupted hardware operation is safe. The
-            # upstream firmware auto-powers-off on inactivity; the process is
-            # terminated only after a long serial timeout has already elapsed.
-            process.kill()
+            # upstream firmware auto-powers-off on inactivity; terminate only
+            # after the long serial timeout has already elapsed.
+            try:
+                if process.poll() is None:
+                    process.kill()
+            except OSError:
+                # The process may have exited between poll() and kill().
+                pass
             process.wait()
-            for reader in readers:
-                reader.join(timeout=2)
             stdout, stderr = "".join(stdout_lines), "".join(stderr_lines)
             message = (stderr or stdout).strip()
             raise ProtocolError(
@@ -127,8 +130,16 @@ class ProgrammerSession:
                 "safe state before touching the target. " + message
             ) from exc
         finally:
+            # A completed/killed process closes the pipes; join the readers so
+            # no daemon I/O threads are left behind when the GUI exits.
             for reader in readers:
-                reader.join(timeout=2)
+                reader.join()
+            for stream in (process.stdout, process.stderr):
+                if stream is not None:
+                    try:
+                        stream.close()
+                    except OSError:
+                        pass
             with self._active_lock:
                 self._active_process = None
             # A cancellation requested during a serial command is deferred until
@@ -150,7 +161,6 @@ class ProgrammerSession:
     def connect(self, port: str, baud: int = 115200, progress: Progress = None) -> ProgrammerState:
         if not port:
             raise ProgrammerNotReady("Select a serial port first.")
-        self._cancel_requested.clear()
         output = self._checked(["--pic-serial-port", port, "--speed", baud, "--list-devices"], progress)
         devices = []
         in_list = False

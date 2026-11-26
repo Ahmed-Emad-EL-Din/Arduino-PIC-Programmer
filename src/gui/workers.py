@@ -5,6 +5,8 @@ from typing import Callable, Optional
 
 from PySide6.QtCore import QThread, Signal
 
+from app.diagnostics import report_exception
+
 
 class Worker(QThread):
     progressed = Signal(str)
@@ -29,8 +31,8 @@ class Worker(QThread):
         try:
             self.result = self.fn(self.progressed.emit, self.percented.emit,
                                   lambda: self._cancel_requested)
-        except Exception as exc:
-            self.error = str(exc)
+        except BaseException as exc:
+            self.error = report_exception(self.name, exc)
             self.failed.emit(self.error)
         else:
             self.succeeded.emit(self.result)
@@ -49,7 +51,16 @@ class SingleLane:
             raise RuntimeError("A hardware operation is already running")
         self.current = worker
         worker.finished.connect(self._finished)
-        worker.start()
+        try:
+            worker.start()
+        except Exception:
+            if self.current is worker:
+                self.current = None
+            try:
+                worker.finished.disconnect(self._finished)
+            except (RuntimeError, TypeError):
+                pass
+            raise
 
     def _finished(self) -> None:
         current = self.current
