@@ -226,7 +226,7 @@ class TestGUIIntegration(unittest.TestCase):
 
         self.assertFalse(dlg_flash._uploading)
         self.assertEqual(flashed, [("COM4", "nano_new")])
-        self.assertIn("uploaded", dlg_flash.status.text().lower())
+        self.assertIn("upload completed", dlg_flash.status.text().lower())
         dlg_flash.close()
 
     def test_flash_dialog_explains_unsupported_bootloader_uploads(self):
