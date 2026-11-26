@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSplitter,
     QToolBar,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -312,11 +313,12 @@ class MainWindow(QMainWindow):
         self.btn_connect.clicked.connect(self._connect)
 
         self.btn_disconnect = QPushButton("Disconnect")
+        self.btn_disconnect.setVisible(False)
         self.btn_disconnect.clicked.connect(self._disconnect)
 
-        self.btn_flash_ard = QPushButton("Flash Arduino…")
+        self.btn_flash_ard = QPushButton("Install Firmware…")
         self.btn_flash_ard.setToolTip(
-            "Upload ProgramPic v1.8.horo firmware onto the selected Arduino via avrdude"
+            "Install or update ProgramPic v1.8.horo on the selected Arduino. This replaces its current sketch."
         )
         self.btn_flash_ard.clicked.connect(self._flash_arduino)
 
@@ -391,7 +393,22 @@ class MainWindow(QMainWindow):
         self.lbl_target_guidance.setAccessibleName("Target selection and identity limitations")
         lay.addWidget(self.lbl_target_guidance)
 
-        # Non-HEX Silicon Utilities: Blank Check, Read Backup, Bulk Erase
+        self.btn_more_target = QToolButton()
+        self.btn_more_target.setObjectName("disclosureButton")
+        self.btn_more_target.setText("More target actions")
+        self.btn_more_target.setAccessibleName("Show more target actions")
+        self.btn_more_target.setToolTip("Open optional blank-check, read-backup, and erase tools.")
+        self.btn_more_target.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.btn_more_target.setArrowType(Qt.ArrowType.RightArrow)
+        self.btn_more_target.setCheckable(True)
+        self.btn_more_target.toggled.connect(self._toggle_target_tools)
+        lay.addWidget(self.btn_more_target, 0, Qt.AlignmentFlag.AlignLeft)
+
+        self.target_tools_panel = QFrame()
+        self.target_tools_panel.setObjectName("targetToolsPanel")
+        tools_layout = QVBoxLayout(self.target_tools_panel)
+        tools_layout.setContentsMargins(8, 8, 8, 8)
+        tools_layout.setSpacing(6)
         grid = QGridLayout()
         grid.setSpacing(6)
         self.btn_blank = QPushButton("Blank Check")
@@ -407,7 +424,9 @@ class MainWindow(QMainWindow):
         grid.addWidget(self.btn_blank, 0, 0)
         grid.addWidget(self.btn_read, 0, 1)
         grid.addWidget(self.btn_erase, 0, 2)
-        lay.addLayout(grid)
+        tools_layout.addLayout(grid)
+        self.target_tools_panel.setVisible(False)
+        lay.addWidget(self.target_tools_panel)
         return card
 
     def _build_firmware_card(self) -> QFrame:
@@ -538,7 +557,7 @@ class MainWindow(QMainWindow):
         self.act_ports.triggered.connect(self._refresh_ports)
         m_prog.addAction(self.act_ports)
 
-        self.act_flash = QAction("Flash Arduino Firmware…", self)
+        self.act_flash = QAction("Install/Update ProgramPic Firmware…", self)
         self.act_flash.triggered.connect(self._flash_arduino)
         m_prog.addAction(self.act_flash)
 
@@ -757,6 +776,15 @@ class MainWindow(QMainWindow):
             lbl.style().unpolish(lbl)
             lbl.style().polish(lbl)
 
+    def _toggle_target_tools(self, expanded: bool) -> None:
+        self.target_tools_panel.setVisible(expanded)
+        self.btn_more_target.setArrowType(
+            Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow
+        )
+        self.btn_more_target.setAccessibleName(
+            "Hide more target actions" if expanded else "Show more target actions"
+        )
+
     def _on_board_changed(self) -> None:
         bkey = str(self.cmb_board.currentData() or "uno")
         self.board_key = bkey
@@ -913,6 +941,7 @@ class MainWindow(QMainWindow):
     def _refresh_actions(self) -> None:
         busy = self.lane.busy
         conn = self.session.connected
+        has_port = bool(self.cmb_port.currentData())
         has_hex = self.hex_img is not None and not self.hex_img.is_empty()
         hex_fits = False
         if has_hex:
@@ -954,16 +983,16 @@ class MainWindow(QMainWindow):
                 self.lbl_connection_guidance,
                 f"Connected on {self.session.state.port}. Target identity and socket voltage are not independently measured by this app.",
             )
-        elif not self.cmb_port.currentData():
+        elif not has_port:
             self._set_guidance(
                 self.lbl_connection_guidance,
-                "No serial port available. Connect the Arduino by USB, then select Rescan.",
+                "No serial port found. Connect the Arduino by USB, then select Rescan. If ProgramPic is not installed, use Install Firmware.",
                 "warn",
             )
         else:
             self._set_guidance(
                 self.lbl_connection_guidance,
-                "Confirm the selected port belongs to the Arduino, then Connect. Board selection configures wiring; it does not detect hardware.",
+                "Next: confirm the selected port belongs to the Arduino, then Connect. Board choice only sets the wiring reference.",
             )
 
         bw = get_board_wiring(self.board_key)
@@ -994,7 +1023,10 @@ class MainWindow(QMainWindow):
         self.cmb_port.setEnabled(not busy and not conn)
         self.btn_rescan.setEnabled(not busy and not conn)
         self.btn_flash_ard.setEnabled(not busy and not conn)
-        self.btn_connect.setEnabled(not busy and not conn)
+        self.btn_connect.setVisible(not conn)
+        self.btn_disconnect.setVisible(conn)
+        self.btn_flash_ard.setVisible(not conn)
+        self.btn_connect.setEnabled(not busy and not conn and has_port)
         self.btn_disconnect.setEnabled(not busy and conn)
 
         self.cmb_mcu.setEnabled(not busy)
@@ -1030,8 +1062,9 @@ class MainWindow(QMainWindow):
         self.btn_program.setToolTip(op_reason or "Erase, write the selected HEX, then compare read-back when enabled in Settings.")
         self.btn_verify.setToolTip(op_reason or "Compare the selected HEX image with target memory; this does not identify the target or measure voltage.")
         self.btn_connect.setToolTip(
-            "Select an available serial port first." if not self.cmb_port.currentData()
-            else "Connect to the selected Arduino and check its ProgramPic handshake."
+            "Wait for the active operation to finish." if busy else
+            "Connect the Arduino by USB and select Rescan to find its port." if not has_port else
+            "Connect to the selected Arduino and check its ProgramPic handshake."
         )
         self.btn_detect.setToolTip(
             "Connect first. This asks ProgramPic to report a model; Raw silicon ID and socket voltage are not exposed."
@@ -1046,7 +1079,11 @@ class MainWindow(QMainWindow):
         # Menu actions
         self.act_ports.setEnabled(not busy and not conn)
         self.act_flash.setEnabled(not busy and not conn)
-        self.act_connect.setEnabled(not busy and not conn)
+        self.act_connect.setEnabled(not busy and not conn and has_port)
+        self.act_connect.setToolTip(
+            "Connect the Arduino by USB and rescan ports first." if not has_port
+            else "Connect to the selected Arduino and check its ProgramPic handshake."
+        )
         self.act_settings.setEnabled(not busy)
         self.act_disconnect.setEnabled(not busy and conn)
         self.act_detect.setEnabled(not busy and conn)

@@ -56,7 +56,27 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertIn("not measured", self.win.status_lbl.text())
         self.assertIn("Raw silicon ID", self.win.btn_detect.toolTip())
         self.assertIn("Target selected:", self.win.chip_target.text())
+        self.win.cmb_port.clear()
+        self.win.cmb_port.addItem("No serial ports detected", "")
+        self.win._refresh_actions()
+        self.assertFalse(self.win.btn_connect.isEnabled())
+        self.assertIn("No serial port found", self.win.lbl_connection_guidance.text())
+        self.assertFalse(self.win.target_tools_panel.isVisible())
         capture_window(self.win, "main-dark-no-hardware.png")
+
+    def test_connection_controls_follow_connection_state(self):
+        self.win.session.state.verified = True
+        self.win.session.state.port = "COM1"
+        self.win._refresh_actions()
+        self.assertFalse(self.win.btn_connect.isVisible())
+        self.assertTrue(self.win.btn_disconnect.isVisible())
+        self.assertFalse(self.win.btn_flash_ard.isVisible())
+
+    def test_optional_target_actions_expand_on_request(self):
+        self.assertFalse(self.win.target_tools_panel.isVisible())
+        self.win.btn_more_target.click()
+        self.assertTrue(self.win.target_tools_panel.isVisible())
+        self.assertEqual(self.win.btn_more_target.accessibleName(), "Hide more target actions")
 
     def test_circuit_panel_tabs(self):
         panel = self.win.circuit_panel
