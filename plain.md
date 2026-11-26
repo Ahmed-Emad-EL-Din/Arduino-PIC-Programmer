@@ -71,7 +71,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 ### Screen-by-screen review
 - [x] Replace unsupported “0 V/safe/powered off” UI claims with explicit “voltage not measured” guidance; distinguish selected target from the programmer's reported model and explain the host's raw-ID limitation.
 - [x] Make programming summaries reflect the actual read-back and calibration-preservation settings; block erase when calibration preservation is unchecked and no explicit calibration backup is supplied. Core regression tests pass.
-- [ ] Rerun the Windows GUI tests after these copy/confirmation changes and visually inspect fresh screenshots before UI acceptance.
+- [ ] Rerun the Windows GUI tests after these copy/confirmation changes and visually inspect fresh screenshots before UI acceptance. The first run found the HEX inspector warning state omitted its “memory-map check only” caveat; the wording fix is applied, and the next run must prove it passes.
 - [ ] First launch: explain the three-step setup (board/port → connect host → choose target/open HEX); show a friendly “no hardware connected” state and a discoverable firmware/setup guide.
 - [ ] Board and port card: distinguish board selection from board detection; make missing ports, rescan, busy ports, and firmware-upload limitations obvious and actionable.
 - [ ] Programmer connection: show handshake state and port/firmware separately from target identity; provide connect/disconnect progress and actionable serial errors.
@@ -153,7 +153,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - `bash packaging/build_host_posix.sh`: built the upstream C++ helper into ignored `tools/ardpicprog`; CLI help smoke test passed.
 - `git diff --check`: passed on the current changes.
 - PyInstaller spec path was corrected after an initial failed attempt. A Linux packaging attempt is still blocked because the sandbox Python lacks `libpython3.11.so.1.0`; this is not a Windows build result.
-- Current local environment cannot run Qt tests: this recreated `.venv` has only pytest/pyserial installed and PySide6 is absent; a prior Qt import attempt also hit missing system `libGL.so.1`. Windows Actions previously ran the GUI suite, but the current copy changes still need a new Windows run and clean-machine launch test.
+- Current local environment cannot run Qt tests: this recreated `.venv` has only pytest/pyserial installed and PySide6 is absent; a prior Qt import attempt also hit missing system `libGL.so.1`. PR #14 run `45761077739` exposed a GUI assertion failure: the HEX inspector's configuration-warning state lacked the hardware-identity/wiring/VPP caveat. That message now appears on warning/error/clean states; a rerun is pending.
 - Windows CI passed for commit `addb764` in Actions run `45729144989`; it produced a temporary candidate ZIP plus CI-checked SHA-256 sidecar and the UI screenshot artifact. None is a published Release asset. The local GUI test remains blocked by missing Linux `libGL.so.1`; no clean-machine Windows launch or physical hardware test has been performed.
 
 ## Remaining release blockers
