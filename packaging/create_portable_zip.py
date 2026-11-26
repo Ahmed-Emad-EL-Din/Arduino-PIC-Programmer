@@ -118,7 +118,7 @@ def main() -> int:
     saved = max(0.0, (1 - zip_bytes / source_bytes) * 100) if source_bytes else 0.0
     print(
         f"Validated compact portable ZIP: {file_count} runtime files, "
-        f"{source_bytes:,} bytes raw → {zip_bytes:,} bytes ZIP ({saved:.1f}% smaller)."
+        f"{source_bytes:,} bytes raw -> {zip_bytes:,} bytes ZIP ({saved:.1f}% smaller)."
     )
     return 0
 

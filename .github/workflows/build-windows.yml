@@ -242,8 +242,14 @@ jobs:
       - name: Build per-user installer
         shell: pwsh
         run: |
-          & $env:INNO_SETUP_COMPILER 'packaging/installer.iss'
-          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed.' }
+          $CompilerOutput = & $env:INNO_SETUP_COMPILER 'packaging/installer.iss' 2>&1
+          $CompilerExitCode = $LASTEXITCODE
+          $CompilerOutput | ForEach-Object { Write-Output $_ }
+          if ($CompilerExitCode -ne 0) {
+            $Details = ($CompilerOutput | Out-String).Trim()
+            if ([string]::IsNullOrWhiteSpace($Details)) { $Details = 'ISCC.exe returned a non-zero exit code without diagnostic output.' }
+            throw "Inno Setup compilation failed (exit code $CompilerExitCode): $Details"
+          }
           if (!(Test-Path 'dist/installer/Arduino-PIC-Programmer-Setup-x64.exe')) {
             throw 'Installer output was not created.'
           }
@@ -335,8 +341,16 @@ jobs:
         run: |
           $Package = 'dist/Arduino-PIC-Programmer'
           $Zip = 'dist/Arduino-PIC-Programmer-Windows-x64.zip'
-          python packaging/create_portable_zip.py --source $Package --output $Zip
-          if ($LASTEXITCODE -ne 0) { throw 'Compact portable ZIP creation/validation failed.' }
+          $ZipOutput = & python -u packaging/create_portable_zip.py --source $Package --output $Zip 2>&1
+          $ZipExitCode = $LASTEXITCODE
+          $ZipOutput | ForEach-Object { Write-Output $_ }
+          if ($ZipExitCode -ne 0) {
+            $Details = (($ZipOutput | Out-String) -replace '\s+', ' ').Trim()
+            if ([string]::IsNullOrWhiteSpace($Details)) { $Details = 'Python returned a non-zero exit code without diagnostic output.' }
+            if ($Details.Length -gt 3000) { $Details = $Details.Substring(0, 3000) }
+            Write-Output "::error title=Portable ZIP builder diagnostics::$Details"
+            throw "Compact portable ZIP creation/validation failed (exit code $ZipExitCode): $Details"
+          }
           $ZipHash = (Get-FileHash -Path $Zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$ZipHash  Arduino-PIC-Programmer-Windows-x64.zip" | Set-Content -Path "$Zip.sha256" -Encoding ascii
           $ZipWrittenHash = ((Get-Content -Path "$Zip.sha256" -Raw).Trim() -split ' +')[0]
