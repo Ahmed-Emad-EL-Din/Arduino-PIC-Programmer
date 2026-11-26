@@ -70,6 +70,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.win.cmb_port.addItem("No serial ports detected", "")
         self.win._refresh_actions()
         self.assertFalse(self.win.btn_connect.isEnabled())
+        self.assertEqual(self.win.btn_rescan.objectName(), "primary")
         self.assertIn("No serial port found", self.win.lbl_connection_guidance.text())
         self.assertFalse(self.win.target_tools_panel.isVisible())
         capture_window(self.win, "main-dark-no-hardware.png")
@@ -110,6 +111,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertFalse(self.win.btn_connect.isVisible())
         self.assertTrue(self.win.btn_disconnect.isVisible())
         self.assertFalse(self.win.btn_flash_ard.isVisible())
+        self.assertEqual(self.win.btn_open_hex.objectName(), "primary")
 
     def test_optional_target_actions_expand_on_request(self):
         self.assertFalse(self.win.target_tools_panel.isVisible())
@@ -135,8 +137,12 @@ class TestGUIIntegration(unittest.TestCase):
             img.data[i * 2 + 1] = (w >> 8) & 0xFF
         self.win.hex_img = img
         self.win.hex_path = "/demo/blink_pic16f84a.hex"
+        self.win.session.state.verified = True
+        self.win.session.state.port = "COM1"
         self.win._refresh_hex_summary()
         self.win._refresh_actions()
+        self.assertTrue(self.win.btn_program.isEnabled())
+        self.assertEqual(self.win.btn_program.objectName(), "primary")
         self.win.circuit_panel.set_hex_image(img)
         self.win.circuit_panel.tabs.setCurrentIndex(2)
         self.assertIn(
@@ -159,6 +165,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.win._refresh_actions()
         self.assertFalse(self.win.btn_program.isEnabled())
         self.assertFalse(self.win.btn_verify.isEnabled())
+        self.assertEqual(self.win.btn_inspect_hex.objectName(), "primary")
         self.assertIn("outside", self.win.btn_program.toolTip())
 
     def test_reported_target_mismatch_blocks_hardware_actions(self):
@@ -176,6 +183,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertFalse(self.win.btn_erase.isEnabled())
         self.assertFalse(self.win.btn_program.isEnabled())
         self.assertTrue(self.win.btn_detect.isEnabled())
+        self.assertEqual(self.win.btn_detect.objectName(), "primary")
         self.assertIn("Blocked:", self.win.lbl_target_guidance.text())
 
     def test_flash_dialog_explains_unsupported_bootloader_uploads(self):

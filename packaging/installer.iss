@@ -10,6 +10,8 @@ AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
 AppPublisherURL=https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer
 AppSupportURL=https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/issues
+AppCopyright=Copyright (C) 2026 Ahmed Emad El-Din Hussein
+AppComments=Arduino-based PIC programmer desktop application
 AppUpdatesURL=https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases
 DefaultDirName={localappdata}\Programs\{#AppName}
 DefaultGroupName={#AppName}
@@ -21,6 +23,8 @@ LicenseFile=..\LICENSE
 SetupIconFile=..\assets\app-icon.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
+UninstallDisplayVersion={#AppVersion}
+UninstallDisplayPublisher={#AppPublisher}
 OutputDir=..\dist\installer
 OutputBaseFilename=Arduino-PIC-Programmer-Setup-x64
 Compression=lzma2/ultra64
@@ -43,7 +47,6 @@ Source: "..\dist\Arduino-PIC-Programmer\*"; DestDir: "{app}"; Flags: ignoreversi
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; WorkingDir: "{app}"
-Name: "{autoprograms}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]

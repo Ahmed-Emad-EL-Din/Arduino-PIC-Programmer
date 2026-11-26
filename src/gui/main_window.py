@@ -507,6 +507,9 @@ class MainWindow(QMainWindow):
         file_row = QHBoxLayout()
         file_row.setSpacing(6)
         self.btn_open_hex = QPushButton("Open HEX File…")
+        self.btn_open_hex.setToolTip(
+            "Load an Intel HEX image and check it against the selected PIC memory map."
+        )
         self.btn_open_hex.clicked.connect(self.open_hex)
 
         self.btn_reload_hex = QPushButton("Reload")
@@ -829,6 +832,14 @@ class MainWindow(QMainWindow):
                 lbl._refresh_elision()
 
     @staticmethod
+    def _set_primary_button(button: QPushButton, primary: bool) -> None:
+        object_name = "primary" if primary else ""
+        if button.objectName() != object_name:
+            button.setObjectName(object_name)
+            button.style().unpolish(button)
+            button.style().polish(button)
+
+    @staticmethod
     def _set_guidance(lbl: QLabel, text: str, variant: str = "neutral") -> None:
         """Update compact, persistent state guidance without relying on color alone."""
         obj = {"warn": "guidanceWarn", "ok": "guidanceOk"}.get(variant, "guidance")
@@ -1098,11 +1109,34 @@ class MainWindow(QMainWindow):
 
         self.btn_open_hex.setEnabled(not busy)
         self.btn_reload_hex.setEnabled(not busy and bool(self.hex_path))
+        self.btn_inspect_hex.setEnabled(not busy and has_hex)
         self.btn_program.setEnabled(not busy and conn and has_hex and hex_fits and not target_mismatch)
         self.btn_verify.setEnabled(not busy and conn and has_hex and hex_fits and not target_mismatch)
         self.progress.setVisible(busy)
         self.btn_cancel.setVisible(busy)
         self.btn_cancel.setEnabled(busy)
+
+        next_action = None
+        if not busy:
+            if not conn:
+                next_action = self.btn_connect if has_port else self.btn_rescan
+            elif target_mismatch:
+                next_action = self.btn_detect
+            elif not has_hex:
+                next_action = self.btn_open_hex
+            elif not hex_fits:
+                next_action = self.btn_inspect_hex
+            else:
+                next_action = self.btn_program
+        for button in (
+            self.btn_rescan,
+            self.btn_connect,
+            self.btn_detect,
+            self.btn_open_hex,
+            self.btn_inspect_hex,
+            self.btn_program,
+        ):
+            self._set_primary_button(button, button is next_action)
 
         if target_mismatch:
             op_reason = "ProgramPic reported a different model. Resolve the target mismatch before hardware operations."
