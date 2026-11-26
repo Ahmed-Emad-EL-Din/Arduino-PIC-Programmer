@@ -9,6 +9,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QMessageBox, QToolBar
+from PySide6.QtTest import QTest
 from PySide6.QtCore import Qt
 
 from core.mcu_db import lookup, all_devices
@@ -218,6 +219,7 @@ class TestGUIIntegration(unittest.TestCase):
             release_worker.set()
             self.assertTrue(worker.wait(5000))
             QApplication.processEvents()
+            QTest.qWait(25)
 
         self.assertFalse(self.win._closing_after_operation)
         self.assertFalse(self.win.lane.busy)
