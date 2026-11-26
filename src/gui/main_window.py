@@ -70,7 +70,7 @@ class StatusChip(QLabel):
     def __init__(self, max_width: int, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._full_text = ""
-        self.setMinimumWidth(0)
+        self.setMinimumWidth(88)
         self.setMaximumWidth(max_width)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
 
@@ -85,7 +85,7 @@ class StatusChip(QLabel):
         self._refresh_elision()
 
     def _refresh_elision(self) -> None:
-        available = max(12, self.contentsRect().width() - 16)
+        available = max(48, self.contentsRect().width() - 16)
         self.setText(
             QFontMetrics(self.font()).elidedText(
                 self._full_text, Qt.TextElideMode.ElideRight, available
