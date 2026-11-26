@@ -50,7 +50,8 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 
 - [x] Create/restore the app entry point, persistent settings, dialogs, theme, icons, and worker lane required by the workbench.
 - [x] Add test coverage for HEX parsing, backend adapter results, and SVG validity.
-- [ ] Run the full GUI integration suite on a supported Windows runner; Linux GUI tests cannot currently import Qt because this environment lacks system graphics libraries.
+- [x] Add real Qt window screenshot capture for dark/light home screens and the HEX inspector; add an Actions artifact upload step for review.
+- [ ] Run the screenshot-enabled GUI integration suite on a supported Windows runner and visually review the generated images; Linux GUI tests cannot currently import Qt because this environment lacks system graphics libraries.
 - [ ] Test startup without hardware, settings file, or recent files; test corrupt settings and unavailable COM ports.
 - [ ] Test file open/drag-drop/save, recent files, preflight dismissal/acceptance, settings persistence, cancellation, and clean shutdown.
 - [ ] Test the UI at common Windows DPI scales and resolutions; ensure dialogs/buttons/text remain visible.
@@ -80,6 +81,19 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [ ] Test wrong target, unknown ID, no-ID target selection, empty socket, missing VPP, serial disconnect, cancel, and verify failure; confirm writes are blocked or report failure safely.
 - [ ] Have a second tester follow the guide from a clean setup and capture any mismatches.
 - [ ] Acceptance: all claimed workflows and failure cases are physically verified; no unresolved high-severity safety, data-loss, or launch issue remains.
+
+## Phase 5.5 — Professional polish, support, and trust
+
+- [ ] Review actual CI-generated UI screenshots for the main screen in dark/light themes and a HEX-inspector state; fix clipping, unreadable text, awkward spacing, and stale/unverified hardware claims. Screenshot capture runs in the Windows GUI tests; the first artifact is pending a fresh workflow run.
+- [ ] Verify empty/no-hardware, disconnected, loading, failure, success, and destructive-confirmation UI states; ensure errors are actionable and success is never reported prematurely.
+- [ ] Review keyboard navigation, accessible names/focus order, high-DPI scaling, minimum window size, and common 100%/150%/200% Windows display scales.
+- [ ] Verify app branding: final product name/version, executable metadata/icon, support URL, About dialog, and no development suffix in a release build.
+- [ ] Add a generated SHA-256 file for every candidate/release ZIP; verify it after download and publish checksum next to final assets.
+- [ ] Produce a dependency/license inventory (SBOM or equivalent), confirm all bundled notices/licenses are included, and document known limits and supported board/PIC combinations.
+- [ ] Pin third-party GitHub Actions to immutable commit SHAs and add a routine dependency/security update process before public releases.
+- [ ] Decide and document Windows code-signing policy. If unsigned, clearly state SmartScreen may warn; never imply an unsigned build is signed/trusted.
+- [ ] Confirm portable settings/log locations, data retention, privacy behavior, and clean uninstall/removal instructions.
+- [ ] Acceptance: a new tester can find the download, understand the candidate/release status and risks, launch it, diagnose common errors, and verify the package/checksum without relying on chat support.
 
 ## Phase 6 — Publish the real release
 

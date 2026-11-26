@@ -57,6 +57,15 @@ jobs:
           python -m compileall -q src app
           python -m pytest -q
 
+      - name: Upload real Qt UI screenshots for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arduino-PIC-Programmer-UI-screenshots
+          path: artifacts/ui/*.png
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Build portable PyInstaller application
         run: python -m PyInstaller --clean --noconfirm packaging/ardpicprog.spec
 
