@@ -2,7 +2,7 @@
 
 ## Windows build status
 
-**Candidate build:** the screenshot-enabled Windows CI build passed for commit `8b61be2`. [Open the successful GitHub Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45819350412), then scroll to **Artifacts** and download **Arduino-PIC-Programmer-Windows-x64-candidate**. GitHub downloads the Actions artifact as an outer ZIP; extract that first to find the candidate ZIP and its `.sha256` sidecar. In PowerShell, verify the candidate ZIP before extracting it:
+**Candidate build:** the Windows CI build passed for commit `37c1843`. [Open the successful GitHub Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45824025728), then scroll to **Artifacts** and download **Arduino-PIC-Programmer-Windows-x64-candidate**. GitHub downloads the Actions artifact as an outer ZIP; extract that first to find the candidate ZIP and its `.sha256` sidecar. In PowerShell, verify the candidate ZIP before extracting it:
 
 ```powershell
 $zip = 'Arduino-PIC-Programmer-Windows-x64.zip'

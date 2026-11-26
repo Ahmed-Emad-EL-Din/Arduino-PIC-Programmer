@@ -1106,6 +1106,21 @@ class MainWindow(QMainWindow):
             val = max(0, min(100, int(100 * done / total)))
             self.progress.setValue(val)
 
+    @staticmethod
+    def _actionable_operation_error(label: str, message: str) -> str:
+        port_busy_signals = (
+            "access is denied", "access denied", "permission denied", "resource busy",
+            "port is busy", "can't open device", "cannot open device", "ser_open",
+        )
+        if label == "Connect Programmer" and any(
+            signal in message.lower() for signal in port_busy_signals
+        ):
+            return (
+                f"{message}\n\nThe serial port may be in use. Close Arduino Serial Monitor "
+                "and other serial tools, select Rescan, then retry."
+            )
+        return message
+
     def _cancel_current(self) -> None:
         if self.lane.busy:
             self.session.request_cancel()
@@ -1139,6 +1154,7 @@ class MainWindow(QMainWindow):
         def _done_err(err_msg: str) -> None:
             self.progress.setValue(0)
             self._refresh_actions()
+            err_msg = self._actionable_operation_error(label, err_msg)
             self.log(err_msg, "ERR")
             self.status_lbl.setText(f"Stopped: {err_msg.splitlines()[0]}")
             QMessageBox.warning(self, f"{label} stopped", err_msg)

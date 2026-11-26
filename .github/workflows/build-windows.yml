@@ -98,12 +98,56 @@ jobs:
       - name: Validate package inputs
         shell: pwsh
         run: |
-          $App = 'dist/Arduino-PIC-Programmer/Arduino-PIC-Programmer.exe'
-          if (!(Test-Path $App)) { throw "GUI executable missing: $App" }
-          if (!(Test-Path 'dist/Arduino-PIC-Programmer/_internal/tools/ardpicprog.exe')) { throw 'Bundled ArdPicProg helper missing.' }
-          if (!(Test-Path 'dist/Arduino-PIC-Programmer/_internal/tools/avrdude/avrdude.exe')) { throw 'Bundled avrdude missing.' }
-          if (!(Test-Path 'dist/Arduino-PIC-Programmer/_internal/tools/avrdude/avrdude.conf')) { throw 'Bundled avrdude.conf missing.' }
-          if (!(Test-Path 'dist/Arduino-PIC-Programmer/_internal/firmware/precompiled/uno.hex')) { throw 'Uno ProgramPic firmware missing.' }
+          $Package = 'dist/Arduino-PIC-Programmer'
+          $Internal = Join-Path $Package '_internal'
+          $Required = @(
+            "$Package/Arduino-PIC-Programmer.exe",
+            "$Internal/tools/ardpicprog.exe",
+            "$Internal/tools/avrdude/avrdude.exe",
+            "$Internal/tools/avrdude/avrdude.conf",
+            "$Internal/docs/USER_GUIDE.md",
+            "$Internal/assets/reference/ArdPicProg_1_8_horo.png",
+            "$Internal/licenses/LICENSE",
+            "$Internal/licenses/LGPL-3.0.txt",
+            "$Internal/licenses/THIRD_PARTY_NOTICES.md",
+            "$Internal/licenses/COPYING",
+            "$Internal/licenses/UPSTREAM.md"
+          )
+          foreach ($Path in $Required) {
+            if (!(Test-Path $Path)) { throw "Required package file missing: $Path" }
+          }
+          $BoardKeys = @('uno', 'nano_new', 'nano_old', 'pro_mini_5v', 'mega2560', 'leonardo', 'micro')
+          foreach ($Key in $BoardKeys) {
+            $Firmware = "$Internal/firmware/precompiled/$Key.hex"
+            if (!(Test-Path $Firmware)) { throw "ProgramPic firmware missing for $Key." }
+          }
+          $QtPlatform = Get-ChildItem $Internal -Recurse -File -Filter 'qwindows.dll' | Select-Object -First 1
+          if (!$QtPlatform) { throw 'Bundled Qt Windows platform plugin (qwindows.dll) missing.' }
+          $SourceDlls = Get-ChildItem 'tools/avrdude' -File -Filter '*.dll'
+          foreach ($Dll in $SourceDlls) {
+            if (!(Test-Path (Join-Path "$Internal/tools/avrdude" $Dll.Name))) {
+              throw "avrdude dependency DLL missing from package: $($Dll.Name)"
+            }
+          }
+
+      - name: Smoke-test packaged app startup without hardware
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $Exe = (Resolve-Path 'dist/Arduino-PIC-Programmer/Arduino-PIC-Programmer.exe').Path
+          $Process = Start-Process -FilePath $Exe -PassThru
+          try {
+            Start-Sleep -Seconds 8
+            $Process.Refresh()
+            if ($Process.HasExited) {
+              throw "Packaged application exited during startup with code $($Process.ExitCode)."
+            }
+            'Packaged application launched and stayed open without hardware.' | Add-Content $env:GITHUB_STEP_SUMMARY
+          }
+          finally {
+            $Process.Refresh()
+            if (!$Process.HasExited) { Stop-Process -Id $Process.Id -Force }
+          }
 
       - name: Create portable ZIP and SHA-256 checksum
         shell: pwsh
