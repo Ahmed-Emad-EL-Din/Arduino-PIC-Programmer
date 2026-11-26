@@ -1071,7 +1071,7 @@ class MainWindow(QMainWindow):
         else:
             self._set_guidance(
                 self.lbl_connection_guidance,
-                "Next: confirm the selected port belongs to the Arduino, then Connect. Board choice only sets the wiring reference.",
+                "CH340/CH341 boards appear as COMx. If ProgramPic is not installed, choose Install Firmware… first; then connect at 115200 baud.",
             )
 
         bw = get_board_wiring(self.board_key)
@@ -1209,12 +1209,25 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _actionable_operation_error(label: str, message: str) -> str:
+        lowered = message.casefold()
+        if label == "Connect Programmer" and (
+            "no programpic response" in lowered
+            or "did not find a compatible pic programmer" in lowered
+        ):
+            return (
+                f"{message}\n\nThe selected port opened, but no compatible sketch answered. "
+                "Use Install Firmware… to upload ProgramPic to the Nano, choose the matching "
+                "new/old bootloader, keep the serial speed at 115200, close Serial Monitor, "
+                "then reconnect. CH340/CH341 boards work through their normal Windows COMx "
+                "port; no special CH340 setting is required. If no COM port appears, install "
+                "the WCH CH340/CH341 driver and rescan."
+            )
         port_busy_signals = (
             "access is denied", "access denied", "permission denied", "resource busy",
             "port is busy", "can't open device", "cannot open device", "ser_open",
         )
         if label == "Connect Programmer" and any(
-            signal in message.lower() for signal in port_busy_signals
+            signal in lowered for signal in port_busy_signals
         ):
             return (
                 f"{message}\n\nThe serial port may be in use. Close Arduino Serial Monitor "

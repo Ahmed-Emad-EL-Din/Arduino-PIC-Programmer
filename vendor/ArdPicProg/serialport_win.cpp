@@ -33,6 +33,12 @@ bool SerialPort::open(const std::string &deviceName, int speed)
     std::string dev(deviceName);
     if (dev.find("/dev/") == 0)
         dev = dev.substr(5);    // Just in case cygwin-style name is specified.
+    // Use the Win32 device namespace for COM ports. This works for all port
+    // numbers and is required once CH340 clones enumerate as COM10 or higher.
+    if (dev.compare(0, 4, "\\\\.\\") != 0 &&
+        dev.compare(0, 3, "COM") == 0 && dev.size() > 3 &&
+        dev[3] >= '0' && dev[3] <= '9')
+        dev = "\\\\.\\" + dev;
     handle = ::CreateFile(dev.c_str(), GENERIC_READ | GENERIC_WRITE,
                           0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (handle == INVALID_HANDLE_VALUE) {
@@ -46,6 +52,8 @@ bool SerialPort::open(const std::string &deviceName, int speed)
 
     // Set the serial parameters.
     DCB dcb;
+    ::memset(&dcb, 0, sizeof(dcb));
+    dcb.DCBlength = sizeof(dcb);
     if (!::GetCommState(handle, &dcb)) {
         fprintf(stderr, "%s: Not a serial port\n", deviceName.c_str());
         ::CloseHandle(handle);
@@ -64,26 +72,30 @@ bool SerialPort::open(const std::string &deviceName, int speed)
         return false;
     }
 
-    // At this point, the Arduino may auto-reset so we have to wait for
-    // it to come back up again.  Poll the "PROGRAM_PIC_VERSION" command
-    // once a second until we get a response.  Give up after 5 seconds.
-    // To avoid the auto-reset connect a capacitor > 1µF from /Reset to GND.
-    int retry = 5;
+    // CH340 USB-serial adapters reset many Nano clones when DTR is asserted.
+    // Discard bootloader/reset noise, then allow up to 10 seconds for the
+    // bootloader and sketch to start while probing the standard 115200-baud
+    // ProgramPic version command.
+    ::PurgeComm(handle, PURGE_RXABORT | PURGE_RXCLEAR | PURGE_TXABORT | PURGE_TXCLEAR);
+    buflen = 0;
+    bufposn = 0;
+    int retry = 10;
+    bool incompatibleVersion = false;
+    std::string reportedVersion;
     int saveTimeout = timeoutSecs;
     timeoutSecs = 1;
     while (retry > 0) {
         write("PROGRAM_PIC_VERSION\n", 20);
         std::string response = readLine();
-        if (!response.empty()) {
-            if (response.find("ProgramPIC 1.") == 0) {
-                // We've found a version 1 sketch, which we can talk to.
-                _quiet || printf("%s\n", response.c_str());
-                break;
-            } else if (response.find("ProgramPIC ") == 0) {
-                // Version 2 or higher sketch - cannot talk to this.
-                retry = 0;
-                break;
-            }
+        if (response.find("ProgramPIC 1.") == 0) {
+            // The legacy ProgramPic 1.x serial protocol is supported.
+            _quiet || printf("%s\n", response.c_str());
+            break;
+        } else if (response.find("ProgramPIC ") == 0) {
+            incompatibleVersion = true;
+            reportedVersion = response;
+            retry = 0;
+            break;
         }
         --retry;
     }
@@ -92,8 +104,17 @@ bool SerialPort::open(const std::string &deviceName, int speed)
         return true;
     ::CloseHandle(handle);
     handle = INVALID_HANDLE_VALUE;
-    fprintf(stderr, "%s: did not find a compatible PIC programmer\n",
-            deviceName.c_str());
+    if (incompatibleVersion) {
+        fprintf(stderr, "%s: found %s, but this host requires ProgramPIC 1.x firmware.\n",
+                deviceName.c_str(), reportedVersion.c_str());
+    } else {
+        fprintf(stderr,
+                "%s: no ProgramPic response after 10 seconds at %d baud. "
+                "Install ProgramPic firmware, select the correct COM port and Nano bootloader, "
+                "use 115200 baud, and close other serial tools. CH340/CH341 adapters are "
+                "supported as standard Windows COM ports when their driver is installed.\n",
+                deviceName.c_str(), speed);
+    }
     return false;
 }
 
