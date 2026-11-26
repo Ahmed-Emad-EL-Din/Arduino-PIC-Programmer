@@ -11,6 +11,7 @@ for entry in (ROOT, ROOT / "src"):
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from app import APP_NAME, ORG_NAME
+from app.diagnostics import configure_logging, install_exception_hooks
 from gui.main_window import MainWindow
 
 
@@ -18,6 +19,8 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(ORG_NAME)
+    configure_logging()
+    install_exception_hooks()
     app_root = Path(sys._MEIPASS) if getattr(sys, "frozen", False) else ROOT
     icon_path = app_root / "assets" / "app-icon.ico"
     if icon_path.is_file():

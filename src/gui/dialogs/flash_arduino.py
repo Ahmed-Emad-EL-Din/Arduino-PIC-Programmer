@@ -14,7 +14,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from core.avrdude import BOARDS, BOARD_BY_KEY, flash_firmware
+from app.diagnostics import report_exception, show_diagnostic_error
+from core.avrdude import BOARDS, BOARD_BY_KEY, FlashResult, flash_firmware
 from core.serial_link import LinkError, list_serial_ports
 from gui.workers import Worker
 
@@ -34,14 +35,17 @@ class FlashArduinoDialog(QDialog):
         self._upload_port = ""
         self._upload_board_key = ""
         self._upload_board_label = ""
+        self._upload_baud = 0
+        self._upload_fallback_used = False
         self._uploading = False
         self.setMinimumWidth(520)
 
         layout = QVBoxLayout(self)
         note = QLabel(
             "Uploading replaces the sketch on the selected Arduino. Choose the matching board and bootloader. "
-            "Remove any reset capacitor while flashing, then reinstall it only after upload completes. "
-            "CH340/CH341 Nano clones use their normal Windows COM port."
+            "Nano firmware upload uses the board bootloader speed (115200 or 57600 baud); if sync fails, "
+            "the app retries the alternate speed. Flash this updated sketch once after upgrading the app; "
+            "the PIC programmer host link is separate and uses 9600 baud. CH340/CH341 boards use their normal COM port."
         )
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -137,14 +141,35 @@ class FlashArduinoDialog(QDialog):
         if message:
             self.status.setText(message)
 
-    def _on_upload_succeeded(self, output) -> None:
+    def _on_upload_succeeded(self, result) -> None:
+        if isinstance(result, FlashResult):
+            self._upload_output = result.output
+            self._upload_board_key = result.board_key
+            self._upload_board_label = BOARD_BY_KEY[result.board_key].label
+            self._upload_baud = result.baud
+            self._upload_fallback_used = result.fallback_used
+        else:  # Keep mocked/older result providers friendly to the UI.
+            self._upload_output = str(result or "")
+            board = BOARD_BY_KEY.get(self._upload_board_key)
+            self._upload_baud = board.bootloader_baud if board else 0
+            self._upload_fallback_used = False
+        try:
+            self.settings.board_key = self._upload_board_key
+            self.settings.port = self._upload_port
+            self.settings.sync()
+        except Exception as exc:
+            self._upload_error = report_exception("Saving firmware upload settings", exc)
+            self.status.setText(self._output_excerpt(self._upload_error))
+            return
+
         self._upload_succeeded = True
-        self._upload_output = str(output or "")
-        self.settings.board_key = self._upload_board_key
-        self.settings.port = self._upload_port
-        self.settings.sync()
+        fallback_note = (
+            f" (auto-retried successfully at {self._upload_baud} baud)"
+            if self._upload_fallback_used else ""
+        )
         self.status.setText(
-            f"Firmware upload completed for {self._upload_board_label} on {self._upload_port}."
+            f"Firmware upload completed for {self._upload_board_label} on "
+            f"{self._upload_port}{fallback_note}."
         )
         self.flashed.emit(self._upload_port, self._upload_board_key)
 
@@ -156,15 +181,16 @@ class FlashArduinoDialog(QDialog):
         self._worker = None
         self._set_uploading(False)
         if self._upload_error:
-            QMessageBox.critical(
+            show_diagnostic_error(
                 self,
                 "Firmware upload failed",
                 self._output_excerpt(self._upload_error),
+                critical=True,
             )
         elif self._upload_succeeded:
             summary = (
                 f"ProgramPic firmware uploaded to {self._upload_board_label} "
-                f"on {self._upload_port}."
+                f"on {self._upload_port} at {self._upload_baud} baud."
             )
             details = self._output_excerpt(self._upload_output)
             QMessageBox.information(
@@ -231,10 +257,13 @@ class FlashArduinoDialog(QDialog):
                 worker.start()
         except RuntimeError as exc:
             self._worker = None
-            self._upload_error = str(exc)
+            self._upload_error = report_exception("Starting firmware upload", exc)
+            worker.deleteLater()
             self._set_uploading(False)
             self.status.setText(self._upload_error)
-            QMessageBox.critical(self, "Firmware upload failed", self._upload_error)
+            show_diagnostic_error(
+                self, "Firmware upload failed", self._upload_error, critical=True
+            )
 
     def reject(self) -> None:
         if self._worker is not None and self._worker.isRunning():

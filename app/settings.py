@@ -10,6 +10,18 @@ class AppSettings:
     def __init__(self) -> None:
         self._settings = QSettings(ORG_NAME, APP_NAME)
         self._settings.beginGroup("workbench")
+        # ProgramPic's serial speed is now 9600 on both the sketch and host.
+        # Migrate the former default once, without resetting other custom
+        # baud rates on later launches.
+        if not self._settings.value("baud_9600_migrated", False, type=bool):
+            try:
+                old_baud = int(self._settings.value("baud", 9600))
+            except (TypeError, ValueError):
+                old_baud = 9600
+            if old_baud == 115200:
+                self._settings.setValue("baud", 9600)
+            self._settings.setValue("baud_9600_migrated", True)
+            self._settings.sync()
 
     def _get(self, key, default):
         return self._settings.value(key, default)
@@ -61,9 +73,9 @@ class AppSettings:
     @property
     def baud(self) -> int:
         try:
-            return int(self._get("baud", 115200))
+            return int(self._get("baud", 9600))
         except (TypeError, ValueError):
-            return 115200
+            return 9600
 
     @baud.setter
     def baud(self, value: int) -> None:

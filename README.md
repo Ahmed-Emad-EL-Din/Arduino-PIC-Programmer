@@ -11,11 +11,11 @@ $actual = (Get-FileHash -Path $setup -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actual -ne $expected) { throw 'SHA-256 mismatch; do not install this file.' }
 ```
 
-Run Setup for a normal per-user installation—no administrator rights required. It creates a Start menu shortcut, registers the app with Windows Installed Apps/Apps & Features, provides an uninstaller, and can create an optional desktop shortcut. It uses the app's branded icon. The portable build is a separate optional artifact, **Arduino-PIC-Programmer-Windows-x64-portable**, so most users need not download a second copy of the app.
+Run Setup for a normal per-user installation—no administrator rights required. It creates a Start menu shortcut, registers the app with Windows Installed Apps/Apps & Features, provides an uninstaller, and can create an optional desktop shortcut. It uses the app's branded icon. The separate optional **Arduino-PIC-Programmer-Installer-Windows-x64** ZIP is deliberately installer-only: when opened, it contains the Setup executable and no loose runtime files. The `.sha256` checksum is supplied beside the ZIP as a separate artifact file.
 
-The portable ZIP uses maximum Deflate compression and contains only `Arduino-PIC-Programmer.exe` plus the required `_internal` runtime bundle. It excludes source code, firmware source, development files, generated caches/debug symbols, and CI reports. Keep `_internal` beside the EXE when extracting it.
+Artifacts are temporary (14-day retention; GitHub sign-in/repository access may be required), **not published GitHub Releases**. The installer ZIP is not a portable app; run its setup executable to install normally.
 
-Artifacts are temporary (14-day retention; GitHub sign-in/repository access may be required), **not published GitHub Releases**. The updated installer/compression workflow is awaiting its next CI run; earlier successful runs may not have the separate artifact names described above.
+After updating, use **Install Firmware…** once to upload the matching ProgramPic sketch before connecting; the host link now defaults to 9600 baud. Nano bootloader flashing uses its separate standard rate (115200 or 57600), and the app retries both after a synchronization error.
 
 ### Why Windows may show “Windows protected your PC”
 

@@ -228,7 +228,7 @@ unsigned long lastActive = 0;
 
 void setup() {
     // Need a serial link to the host.
-    Serial.begin( 115200 );
+    Serial.begin( 9600 );
     // Hold the PIC in the powered down/reset state until we are ready for it.
     digitalWrite(PIN_MCLR, MCLR_RESET);
     digitalWrite(PIN_VDD, LOW);

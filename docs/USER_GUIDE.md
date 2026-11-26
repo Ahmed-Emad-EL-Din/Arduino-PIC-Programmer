@@ -83,7 +83,7 @@ The app must not be considered production-ready until Windows and physical-devic
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| “No ProgramPic response” / “did not find a compatible PIC programmer” | ProgramPic not uploaded, wrong Nano bootloader/COM port/baud, or serial port busy | CH340/CH341 clones use their normal `COMx` port. Choose **Install Firmware…** and the matching Nano bootloader, keep 115200 baud, close Serial Monitor, then reconnect. If no COM port appears, install the WCH CH340/CH341 driver and rescan. |
+| “No ProgramPic response” / “did not find a compatible PIC programmer” | ProgramPic not uploaded, wrong COM port/host-link speed, or serial port busy | CH340/CH341 clones use their normal `COMx` port. Install ProgramPic firmware, then connect using the ProgramPic host-link speed (9600 baud by default). Close Serial Monitor before connecting. If no COM port appears, install the WCH CH340/CH341 driver and rescan. |
 | “No response from the Arduino” | Wrong port / firmware missing / Serial Monitor open | Rescan ports, flash firmware, close Serial Monitor |
 | “avrdude failed — not in sync” | Wrong board variant or port | Try Nano *Old Bootloader*; press reset and retry |
 | `DEVICE failed` | Empty socket, VPP off, chip backwards | Check red VPP LED, pin-1 orientation, lever |
@@ -91,6 +91,10 @@ The app must not be considered production-ready until Windows and physical-devic
 | Verify failed after write | Unstable VPP, bad chip, wiring | Check 13 V supply/wiring; try another chip |
 | Port busy / access denied | Another program using the port | Close MPLAB/QPICkit/Serial Monitor |
 | HEX “outside memory map” | HEX from a different MCU | Load the HEX built for your selected target |
+
+Arduino Nano firmware uploads use the AVR bootloader speed, which is separate from the 9600-baud ProgramPic-to-app link: new Nano bootloaders use 115200 baud and old bootloaders use 57600 baud. The app retries the other standard Nano rate after a bootloader synchronization failure; 9600 baud is not a standard Nano bootloader upload rate. If both attempts fail, copy the error details and check the reset circuit, selected COM port, and whether another application has the port open.
+
+For an unexpected operation error, use **Copy details** in the error dialog and share that text along with the exported Activity Log. The full rotating diagnostic log is saved at the path shown in the error dialog (up to 2 MB per file, with three backups). If a hardware operation is active when you close the app, the app requests cancellation and stays open until the serial host exits safely; do not force-terminate it while it is writing to a PIC.
 
 ## 7. Safety notes
 

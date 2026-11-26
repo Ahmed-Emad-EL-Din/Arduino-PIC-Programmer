@@ -9,6 +9,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QMessageBox, QToolBar
+from PySide6.QtTest import QTest
 from PySide6.QtCore import Qt
 
 from core.mcu_db import lookup, all_devices
@@ -53,15 +54,16 @@ class TestGUIIntegration(unittest.TestCase):
     def test_ch340_handshake_failure_has_actionable_firmware_guidance(self):
         message = MainWindow._actionable_operation_error(
             "Connect Programmer",
-            "COM4: no ProgramPic response after 10 seconds at 115200 baud.",
+            "COM4: no ProgramPic response after 10 seconds at 9600 baud.",
         )
         self.assertIn("Install Firmware", message)
-        self.assertIn("matching new/old bootloader", message)
+        self.assertIn("retries both standard Nano rates", message)
         self.assertIn("CH340/CH341", message)
-        self.assertIn("115200", message)
+        self.assertIn("9600", message)
 
     def test_main_window_initialization(self):
         self.assertEqual(self.win.settings.theme, "dark")
+        self.assertEqual(self.win.settings.baud, 9600)
         self.assertFalse(self.win.brand_icon.pixmap().isNull())
         self.assertFalse(self.win.log_dock.isVisible())
         toolbar = self.win.findChild(QToolBar, "mainToolbar")
@@ -198,6 +200,50 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertEqual(self.win.btn_detect.objectName(), "primary")
         self.assertIn("Blocked:", self.win.lbl_target_guidance.text())
 
+    def test_close_defers_until_active_hardware_worker_exits(self):
+        started = threading.Event()
+        release_worker = threading.Event()
+
+        def blocking_operation(_progress, _percent, _cancel):
+            started.set()
+            release_worker.wait(timeout=3)
+            return "finished safely"
+
+        with patch("gui.main_window.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
+            self.win._run_task(blocking_operation, lambda _result: None, "Test hardware operation")
+            worker = self.win.lane.current
+            self.assertIsNotNone(worker)
+            self.assertTrue(started.wait(timeout=1))
+            self.win.close()
+            self.assertTrue(self.win._closing_after_operation)
+            self.assertTrue(self.win.isVisible())
+            release_worker.set()
+            self.assertTrue(worker.wait(5000))
+            QApplication.processEvents()
+            QTest.qWait(25)
+
+        self.assertFalse(self.win._closing_after_operation)
+        self.assertFalse(self.win.lane.busy)
+        self.assertFalse(self.win.isVisible())
+
+    def test_worker_error_is_diagnostic_and_restores_ui_state(self):
+        def fail_operation(_progress, _percent, _cancel):
+            raise RuntimeError("simulated serial failure")
+
+        with patch("gui.main_window.show_diagnostic_error"):
+            self.win._run_task(fail_operation, lambda _result: None, "Test operation")
+            worker = self.win.lane.current
+            self.assertIsNotNone(worker)
+            self.assertTrue(worker.wait(5000))
+            QApplication.processEvents()
+
+        self.assertFalse(self.win.lane.busy)
+        self.assertFalse(self.win.progress.isVisible())
+        text = self.win.log_pane.text()
+        self.assertIn("simulated serial failure", text)
+        self.assertIn("Diagnostic ID:", text)
+        self.assertIn("Full log:", text)
+
     def test_firmware_upload_runs_off_the_gui_thread_and_keeps_dialog_alive(self):
         dlg_flash = FlashArduinoDialog(self.win.settings, None, self.win)
         dlg_flash.board.setCurrentIndex(dlg_flash.board.findData("nano_new"))
@@ -240,6 +286,25 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertTrue(dlg_flash.flash_button.isEnabled())
         self.assertTrue(dlg_flash.board_note.isHidden())
         dlg_flash.close()
+
+    def test_preflight_checklist_wraps_text_and_requires_every_confirmation(self):
+        items = build_dynamic_preflight(lookup("pic16f84a"), "nano_new")
+        dialog = PreflightDialog(items, "Hardware preflight", "Check the physical setup", self.win)
+        self.assertFalse(dialog.continue_button.isEnabled())
+        self.assertEqual(len(dialog.check_labels), len(items))
+        self.assertTrue(all(label.wordWrap() for label in dialog.check_labels))
+        self.assertIn("0 of", dialog.check_summary.text())
+        dialog.show()
+        QApplication.processEvents()
+
+        QTest.mouseClick(dialog.check_labels[0], Qt.MouseButton.LeftButton)
+        self.assertTrue(dialog.checks[0].isChecked())
+        for checkbox in dialog.checks[1:]:
+            checkbox.setChecked(True)
+        self.assertTrue(dialog.continue_button.isEnabled())
+        dialog.checks[0].setChecked(False)
+        self.assertFalse(dialog.continue_button.isEnabled())
+        dialog.close()
 
     def test_dialogs_instantiation(self):
         dlg_flash = FlashArduinoDialog(self.win.settings, self.win.lane, self.win)

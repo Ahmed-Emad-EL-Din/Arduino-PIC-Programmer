@@ -165,7 +165,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 
 - [ ] Do not publish a release until Phases 2–5 acceptance criteria pass.
 - [ ] Create a version tag from the validated source commit and run the Windows build workflow on that exact tag.
-- [ ] Attach the actual portable ZIP (and/or EXE) to a non-draft GitHub Release; include SHA-256, OS/architecture, setup steps, supported boards/targets, and limitations.
+- [ ] Attach the installer-only ZIP (containing only the setup EXE) to a non-draft GitHub Release; include its SHA-256, OS/architecture, setup steps, supported boards/targets, and limitations.
 - [ ] Verify the asset appears in GitHub Release metadata and can be downloaded without authentication.
 - [ ] Update README and user guide with the exact asset download URL; click-test it signed out and confirm the downloaded package launches.
 - [ ] Acceptance: a new user can download, verify, extract, and run the genuine application directly from the release package without installing Python or separate runtime tools.

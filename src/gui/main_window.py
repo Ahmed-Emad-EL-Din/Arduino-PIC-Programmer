@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Optional, Set, Tuple
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import QTimer, Qt, QUrl
 from PySide6.QtGui import (
     QAction,
     QDesktopServices,
@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
 )
 
 from app import APP_NAME, GITHUB_URL, VERSION
+from app.diagnostics import report_exception, show_diagnostic_error
 from app.settings import AppSettings
 from core.avrdude import BOARD_BY_KEY, BOARDS
 from core.ihex import HexImage, IHexError, load_hex_file
@@ -99,6 +100,7 @@ class MainWindow(QMainWindow):
         self.settings = AppSettings()
         self.session = ProgrammerSession(use_binary=True)
         self.lane = SingleLane()
+        self._closing_after_operation = False
         self.hex_img: Optional[HexImage] = None
         self.hex_path: str = ""
         self.target: McuDevice = lookup(self.settings.mcu) or DEFAULT_DEVICE
@@ -1071,7 +1073,7 @@ class MainWindow(QMainWindow):
         else:
             self._set_guidance(
                 self.lbl_connection_guidance,
-                "CH340/CH341 boards appear as COMx. If ProgramPic is not installed, choose Install Firmware… first; then connect at 115200 baud.",
+                "CH340/CH341 boards appear as COMx. If ProgramPic is not installed, choose Install Firmware… first; then connect at 9600 baud.",
             )
 
         bw = get_board_wiring(self.board_key)
@@ -1216,11 +1218,12 @@ class MainWindow(QMainWindow):
         ):
             return (
                 f"{message}\n\nThe selected port opened, but no compatible sketch answered. "
-                "Use Install Firmware… to upload ProgramPic to the Nano, choose the matching "
-                "new/old bootloader, keep the serial speed at 115200, close Serial Monitor, "
-                "then reconnect. CH340/CH341 boards work through their normal Windows COMx "
-                "port; no special CH340 setting is required. If no COM port appears, install "
-                "the WCH CH340/CH341 driver and rescan."
+                "Use Install Firmware… to install this app's ProgramPic firmware (9600-baud "
+                "host link), select the board that matches the physical Arduino, close Serial "
+                "Monitor, then reconnect. Nano firmware uploads use the bootloader speed; the "
+                "uploader retries both standard Nano rates after a sync error. CH340/CH341 boards "
+                "use their normal Windows COMx port. If no COM port appears, install the WCH "
+                "driver and rescan."
             )
         port_busy_signals = (
             "access is denied", "access denied", "permission denied", "resource busy",
@@ -1251,31 +1254,61 @@ class MainWindow(QMainWindow):
         self.log("Operation aborted at hardware preflight checklist.", "WARN")
         return False
 
+    def _on_worker_finished(self) -> None:
+        """Refresh UI after the lane is idle and complete a deferred close."""
+        self.progress.setValue(0)
+        self._refresh_actions()
+        if self._closing_after_operation:
+            self._closing_after_operation = False
+            QTimer.singleShot(0, self.close)
+
     def _run_task(self, fn, on_ok, label: str) -> None:
         if self.lane.busy:
             QMessageBox.information(self, "Busy", "Wait for the active hardware operation to finish.")
             return
         self.progress.setValue(0)
         self.status_lbl.setText(f"Running: {label}…")
-        worker = Worker(fn, name=label, parent=self)
+        def guarded_task(progress, percent, cancel):
+            if cancel():
+                raise RuntimeError("Operation cancelled before it started; no hardware command was sent.")
+            return fn(progress, percent, cancel)
+
+        worker = Worker(guarded_task, name=label, parent=self)
         worker.progressed.connect(lambda line: self.log(line, "INFO"))
         worker.percented.connect(self._set_pct)
+        worker.finished.connect(self._on_worker_finished)
 
         def _done_ok(res) -> None:
+            try:
+                on_ok(res)
+            except Exception as exc:
+                detail = report_exception(f"Finishing {label}", exc)
+                self.log(detail, "ERR")
+                self.status_lbl.setText(f"Stopped: {type(exc).__name__}")
+                show_diagnostic_error(self, f"{label} failed", detail, critical=True)
             self._refresh_actions()
-            on_ok(res)
 
         def _done_err(err_msg: str) -> None:
             self.progress.setValue(0)
-            self._refresh_actions()
             err_msg = self._actionable_operation_error(label, err_msg)
             self.log(err_msg, "ERR")
             self.status_lbl.setText(f"Stopped: {err_msg.splitlines()[0]}")
-            QMessageBox.warning(self, f"{label} stopped", err_msg)
+            show_diagnostic_error(self, f"{label} stopped", err_msg)
+            self._refresh_actions()
 
         worker.succeeded.connect(_done_ok)
         worker.failed.connect(_done_err)
-        self.lane.start(worker)
+        try:
+            self.lane.start(worker)
+        except RuntimeError as exc:
+            detail = report_exception(f"Starting {label}", exc)
+            worker.deleteLater()
+            self.progress.setValue(0)
+            self.status_lbl.setText(f"Stopped: {type(exc).__name__}")
+            self.log(detail, "ERR")
+            self._refresh_actions()
+            show_diagnostic_error(self, f"Could not start {label}", detail, critical=True)
+            return
         self._refresh_actions()
 
     # ------------------------------------------------------------------
@@ -1733,31 +1766,44 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(QUrl(ARDPICPROG_URL))
 
     def closeEvent(self, ev) -> None:  # noqa: N802
+        if self._closing_after_operation:
+            ev.ignore()
+            return
         if self.lane.busy:
             ans = QMessageBox.question(
                 self,
                 "Hardware operation running",
-                "A hardware operation is still running.\n"
-                "Request cancellation and wait for the host to finish its current command before exiting?",
+                "A hardware operation is still running.\n\n"
+                "Choose Yes to request cancellation. The app will remain open until the "
+                "serial host has finished safely; it will not force-kill an active PIC write.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
             if ans != QMessageBox.StandardButton.Yes:
                 ev.ignore()
                 return
+
+            self._closing_after_operation = True
             self.session.request_cancel()
             self.lane.cancel()
-            worker = self.lane.current
-            if worker is not None and not worker.wait(30000):
-                QMessageBox.warning(
-                    self,
-                    "Operation still running",
-                    "The hardware command has not finished. The application will stay open rather than force-stop a serial write. Wait for the operation to finish. Before handling the target, independently verify that the external VPP supply is off; this app cannot measure socket voltage.",
-                )
-                ev.ignore()
-                return
+            self.status_lbl.setText(
+                "Close requested — waiting for the active hardware command to finish safely."
+            )
+            self.log(
+                "Application close deferred; cancellation requested and the active host operation "
+                "will be allowed to close its serial port safely.",
+                "WARN",
+            )
+            self._refresh_actions()
+            ev.ignore()
+            return
 
-        self.session.disconnect()
-        self.settings.geometry = self.saveGeometry()
-        self.settings.window_state = self.saveState()
+        try:
+            self.session.disconnect()
+            self.settings.geometry = self.saveGeometry()
+            self.settings.window_state = self.saveState()
+        except Exception as exc:
+            detail = report_exception("Saving application state during exit", exc)
+            self.log(detail, "ERR")
+            show_diagnostic_error(self, "Could not save application settings", detail)
         super().closeEvent(ev)
