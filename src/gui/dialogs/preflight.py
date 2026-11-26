@@ -35,9 +35,14 @@ class PreflightDialog(QDialog):
         self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
         self.continue_button = self.buttons.addButton("I verified — Continue", QDialogButtonBox.ButtonRole.AcceptRole)
         self.continue_button.setEnabled(False)
+        self.cancel_button = self.buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        self.cancel_button.setDefault(True)
+        self.cancel_button.setAutoDefault(True)
+        self.cancel_button.setFocus()
+        self.continue_button.setAutoDefault(False)
         self.buttons.rejected.connect(self.reject)
         self.buttons.accepted.connect(self.accept)
-        self.buttons.button(QDialogButtonBox.StandardButton.Cancel).clicked.connect(self.reject)
+        self.cancel_button.clicked.connect(self.reject)
         layout.addWidget(self.buttons)
 
     def _sync(self, *_args) -> None:

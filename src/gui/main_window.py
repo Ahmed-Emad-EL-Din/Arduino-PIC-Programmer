@@ -1,25 +1,4 @@
-"""Main Workbench Window — Professional Two-Column Hardware Engineering UX.
-
-Left Workbench Pane:
-  1. Arduino Programmer Setup & Serial Link (Board selector, Port selector,
-     Flash ProgramPic Firmware, Connect / Disconnect)
-  2. Target PIC MCU & Silicon Operations (MCU selector across all 25 PICs,
-     Auto-Detect Silicon, Blank Check, Read Backup, Bulk Erase)
-  3. Firmware HEX Image & Verified Programming (Drag-and-drop / Open .hex,
-     live usage summary, Preserve calibration checkbox, Program & Verify,
-     Verify Only)
-
-Right Live Inspector Pane (`CircuitPanel`):
-  - Dynamic IEEE/IEC vector Circuit Schematic (`schemdraw` SVG) tailored to
-    the exact `(Arduino Board, Target PIC MCU)` pair
-  - Scale-proportioned PDIP IC Pinout, ZIF-18 seating & JP3 jumper guide, and
-    point-to-point wiring table
-  - HEX Memory Map & 14-bit flat word dump
-  - Official `Ho-Ro/ArdPicProg` v1.8.horo reference schematic & hardware build
-
-Bottom Dock:
-  - Filterable, timestamped Activity Log + operation progress bar & Cancel.
-"""
+"""Desktop interface for configuring, inspecting, and operating the PIC programmer."""
 
 from __future__ import annotations
 
@@ -90,6 +69,7 @@ class MainWindow(QMainWindow):
         self.hex_img: Optional[HexImage] = None
         self.hex_path: str = ""
         self.target: McuDevice = lookup(self.settings.mcu) or DEFAULT_DEVICE
+        self._reported_target_name: Optional[str] = None
         self.board_key: str = (
             self.settings.board_key if self.settings.board_key in BOARD_BY_KEY else "uno"
         )
@@ -146,7 +126,7 @@ class MainWindow(QMainWindow):
         t_lbl = QLabel(APP_NAME)
         t_lbl.setObjectName("appTitle")
         sub_lbl = QLabel(
-            "Arduino-based PIC16F / PIC12F HV ICSP & ZIF-18 workbench (ProgramPic v1.8.horo)"
+            "Arduino-based PIC programmer · ProgramPic v1.8.horo"
         )
         sub_lbl.setObjectName("muted")
         title_col.addWidget(t_lbl)
@@ -275,8 +255,8 @@ class MainWindow(QMainWindow):
         lay.addLayout(
             self._make_card_header(
                 "1",
-                "Arduino Programmer Link",
-                "Select your host Arduino board, flash ProgramPic once, then connect.",
+                "Programmer",
+                "Choose the Arduino type and port, then connect. Flash ProgramPic only if it is not installed.",
             )
         )
 
@@ -287,6 +267,8 @@ class MainWindow(QMainWindow):
         self.cmb_board = QComboBox()
         self.cmb_board.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.cmb_board.setMinimumContentsLength(18)
+        self.cmb_board.setAccessibleName("Arduino board type")
+        self.cmb_board.setToolTip("Board type configures the wiring diagram; it does not detect the connected board.")
         for b in BOARDS:
             self.cmb_board.addItem(b.label, b.key)
         b_idx = self.cmb_board.findData(self.board_key)
@@ -300,7 +282,10 @@ class MainWindow(QMainWindow):
         self.cmb_port = QComboBox()
         self.cmb_port.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.cmb_port.setMinimumContentsLength(14)
+        self.cmb_port.setAccessibleName("Arduino serial port")
+        self.cmb_port.setToolTip("Choose the serial port used by the Arduino programmer.")
         self.btn_rescan = QPushButton("Rescan")
+        self.btn_rescan.setAccessibleName("Rescan serial ports")
         self.btn_rescan.clicked.connect(self._refresh_ports)
         port_row.addWidget(self.cmb_port, 1)
         port_row.addWidget(self.btn_rescan)
@@ -313,6 +298,12 @@ class MainWindow(QMainWindow):
         self.lbl_board_note.setObjectName("muted")
         self.lbl_board_note.setWordWrap(True)
         lay.addWidget(self.lbl_board_note)
+
+        self.lbl_connection_guidance = QLabel()
+        self.lbl_connection_guidance.setObjectName("guidance")
+        self.lbl_connection_guidance.setWordWrap(True)
+        self.lbl_connection_guidance.setAccessibleName("Programmer connection guidance")
+        lay.addWidget(self.lbl_connection_guidance)
 
         btns = QHBoxLayout()
         btns.setSpacing(6)
@@ -345,8 +336,8 @@ class MainWindow(QMainWindow):
         lay.addLayout(
             self._make_card_header(
                 "2",
-                "Target PIC Microcontroller",
-                "Pick the exact PIC MCU — updates the schematic, PDIP pinout & safety gates.",
+                "Target device",
+                "Select the exact PIC marking. This sets the displayed wiring and memory map; it does not identify the chip.",
             )
         )
 
@@ -355,6 +346,8 @@ class MainWindow(QMainWindow):
         self.cmb_mcu = QComboBox()
         self.cmb_mcu.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.cmb_mcu.setMinimumContentsLength(18)
+        self.cmb_mcu.setAccessibleName("Selected PIC target")
+        self.cmb_mcu.setToolTip("Selection changes the memory map and wiring reference; it is not hardware identification.")
         for dev in all_devices():
             pw = get_pic_wiring(dev.name)
             id_tag = "Auto-ID" if dev.has_device_id else "Manual"
@@ -392,6 +385,12 @@ class MainWindow(QMainWindow):
         sbl.addWidget(self.lbl_silicon_probe)
         lay.addWidget(spec_box)
 
+        self.lbl_target_guidance = QLabel()
+        self.lbl_target_guidance.setObjectName("guidance")
+        self.lbl_target_guidance.setWordWrap(True)
+        self.lbl_target_guidance.setAccessibleName("Target selection and identity limitations")
+        lay.addWidget(self.lbl_target_guidance)
+
         # Non-HEX Silicon Utilities: Blank Check, Read Backup, Bulk Erase
         grid = QGridLayout()
         grid.setSpacing(6)
@@ -422,7 +421,7 @@ class MainWindow(QMainWindow):
             self._make_card_header(
                 "3",
                 "Firmware Image (.hex) & Write",
-                "Open or drop an Intel HEX file. Memory bounds & silicon ID are checked before write.",
+                "Open an Intel HEX file. Its addresses are checked against the selected PIC memory map before writing.",
             )
         )
 
@@ -458,15 +457,31 @@ class MainWindow(QMainWindow):
         hbl.addWidget(self.lbl_hex_stats)
         lay.addWidget(hex_box)
 
+        self.lbl_hex_guidance = QLabel()
+        self.lbl_hex_guidance.setObjectName("guidance")
+        self.lbl_hex_guidance.setWordWrap(True)
+        self.lbl_hex_guidance.setAccessibleName("HEX image compatibility status")
+        lay.addWidget(self.lbl_hex_guidance)
+
         self.chk_preserve_cal = QCheckBox(
             "Preserve factory OSCCAL & bandgap calibration bits (recommended)"
         )
         self.chk_preserve_cal.setChecked(True)
+        self.chk_preserve_cal.setToolTip(
+            "Requests preservation of reserved calibration data where supported. "
+            "Behavior must be validated for the exact PIC and programmer firmware."
+        )
         lay.addWidget(self.chk_preserve_cal)
+
+        self.lbl_verify_guidance = QLabel()
+        self.lbl_verify_guidance.setObjectName("guidance")
+        self.lbl_verify_guidance.setWordWrap(True)
+        self.lbl_verify_guidance.setAccessibleName("Read-back comparison setting")
+        lay.addWidget(self.lbl_verify_guidance)
 
         act_row = QHBoxLayout()
         act_row.setSpacing(6)
-        self.btn_program = QPushButton("Program && Verify PIC")
+        self.btn_program = QPushButton("Program PIC…")
         self.btn_program.setObjectName("primary")
         self.btn_program.setMinimumHeight(36)
         self.btn_program.clicked.connect(self._program)
@@ -538,7 +553,7 @@ class MainWindow(QMainWindow):
         m_prog.addAction(self.act_disconnect)
 
         m_prog.addSeparator()
-        self.act_detect = QAction("Auto-Detect PIC", self)
+        self.act_detect = QAction("Query Programmer for Target Model", self)
         self.act_detect.setShortcut(QKeySequence("F6"))
         self.act_detect.triggered.connect(self._detect)
         m_prog.addAction(self.act_detect)
@@ -547,7 +562,7 @@ class MainWindow(QMainWindow):
         self.act_blank.triggered.connect(self._blank_check)
         m_prog.addAction(self.act_blank)
 
-        self.act_program = QAction("Program && Verify PIC…", self)
+        self.act_program = QAction("Program PIC…", self)
         self.act_program.setShortcut(QKeySequence("Ctrl+R"))
         self.act_program.triggered.connect(self._program)
         m_prog.addAction(self.act_program)
@@ -643,20 +658,16 @@ class MainWindow(QMainWindow):
         self.act_about.triggered.connect(lambda: AboutDialog(self).exec())
         m_help.addAction(self.act_about)
 
-        # ---- Top Action Toolbar ----
-        tb = QToolBar("Workbench Toolbar", self)
+        # Keep the toolbar to high-frequency actions; specialist operations stay
+        # in their task cards or the Programmer menu to reduce duplicate controls.
+        tb = QToolBar("Quick actions", self)
         tb.setObjectName("mainToolbar")
         tb.setMovable(False)
         tb.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         tb.addAction(self.act_open)
         tb.addSeparator()
-        tb.addAction(self.act_flash)
         tb.addAction(self.act_connect)
-        tb.addAction(self.act_detect)
-        tb.addSeparator()
         tb.addAction(self.act_program)
-        tb.addAction(self.act_verify)
-        tb.addAction(self.act_save)
         tb.addSeparator()
         tb.addAction(self.act_theme)
         tb.addAction(self.act_settings)
@@ -736,6 +747,16 @@ class MainWindow(QMainWindow):
             lbl.style().unpolish(lbl)
             lbl.style().polish(lbl)
 
+    @staticmethod
+    def _set_guidance(lbl: QLabel, text: str, variant: str = "neutral") -> None:
+        """Update compact, persistent state guidance without relying on color alone."""
+        obj = {"warn": "guidanceWarn", "ok": "guidanceOk"}.get(variant, "guidance")
+        lbl.setText(text)
+        if lbl.objectName() != obj:
+            lbl.setObjectName(obj)
+            lbl.style().unpolish(lbl)
+            lbl.style().polish(lbl)
+
     def _on_board_changed(self) -> None:
         bkey = str(self.cmb_board.currentData() or "uno")
         self.board_key = bkey
@@ -748,6 +769,14 @@ class MainWindow(QMainWindow):
         dev = lookup(mname) or DEFAULT_DEVICE
         self.target = dev
         self.settings.mcu = dev.name
+        if self._reported_target_name:
+            prior = lookup(self._reported_target_name)
+            prior_name = prior.display_name if prior else self._reported_target_name
+            self.lbl_silicon_probe.setText(
+                f"ProgramPic previously reported: {prior_name} (raw ID unavailable)"
+            )
+        else:
+            self.lbl_silicon_probe.setText("Programmer report: not queried for this selection")
         # Preserve calibration checkbox only applies to MCUs with calibration words/bits
         has_cal = dev.reserved_words > 0 or dev.config_save_mask != 0
         self.chk_preserve_cal.setEnabled(has_cal)
@@ -784,6 +813,25 @@ class MainWindow(QMainWindow):
             f"Flash: {self.target.program_words} w  ·  EEPROM: {self.target.data_bytes} B  ·  "
             f"{pw.package}  ·  {cal_str}"
         )
+        if not pw.pinout_verified:
+            self._set_guidance(
+                self.lbl_target_guidance,
+                f"Selected: {self.target.display_name}. Pin-level wiring is not verified in this app; "
+                "check the exact manufacturer datasheet before connecting. The host does not expose raw silicon ID.",
+                "warn",
+            )
+        elif not self.target.has_device_id:
+            self._set_guidance(
+                self.lbl_target_guidance,
+                f"Selected: {self.target.display_name}. This part has no electronic ID; verify its package marking manually. "
+                "The host does not expose raw silicon ID.",
+                "warn",
+            )
+        else:
+            self._set_guidance(
+                self.lbl_target_guidance,
+                f"Selected: {self.target.display_name}. Query Programmer reports a model; it does not provide raw silicon ID.",
+            )
 
         self.circuit_panel.set_context(
             mcu_name=self.target.name,
@@ -805,13 +853,18 @@ class MainWindow(QMainWindow):
                 if self.cmb_port.itemData(i) == prev:
                     self.cmb_port.setCurrentIndex(i)
                     break
+        self._refresh_actions()
 
     def _refresh_hex_summary(self) -> None:
         self.circuit_panel.set_hex_image(self.hex_img)
         if self.hex_img is None or self.hex_img.is_empty():
-            self.lbl_hex_name.setText("No .hex file loaded (drag & drop a .hex file anywhere)")
+            self.lbl_hex_name.setText("No .hex file loaded")
             self.lbl_hex_stats.setText("Program: —  ·  EEPROM: —  ·  Config: —")
             self._set_chip_state(self.chip_file, "HEX: none", "neutral")
+            self._set_guidance(
+                self.lbl_hex_guidance,
+                "Next: open or drop an Intel HEX file. Programming and compare stay unavailable until an image is loaded.",
+            )
             return
 
         fname = Path(self.hex_path).name if self.hex_path else "memory_read.hex"
@@ -820,6 +873,7 @@ class MainWindow(QMainWindow):
         eb = int(diag["data_bytes"])
         cw = int(diag["cfg_words"])
         oot = list(diag["out_of_range"])
+        hex_warnings = list(diag["warnings"])
 
         self.lbl_hex_name.setText(f"Loaded: {fname}")
         self.lbl_hex_stats.setText(
@@ -827,14 +881,90 @@ class MainWindow(QMainWindow):
             f"EEPROM: {eb}/{self.target.data_bytes} B  ·  Config: {cw} w"
         )
         if oot:
-            self._set_chip_state(self.chip_file, f"HEX: {fname} (Range Mismatch)", "bad")
+            self._set_chip_state(self.chip_file, f"HEX: range mismatch ({len(oot)})", "bad")
+            first = ", ".join(f"0x{int(addr):04X}" for addr in oot[:3])
+            more = f" and {len(oot) - 3} more" if len(oot) > 3 else ""
+            self._set_guidance(
+                self.lbl_hex_guidance,
+                f"Blocked: {len(oot)} word(s) fall outside {self.target.display_name}'s memory map "
+                f"({first}{more}). Choose the matching target or correct HEX file. This check does not verify target identity, wiring, or VPP.",
+                "warn",
+            )
+        elif hex_warnings:
+            note = " ".join(hex_warnings[:2])
+            if len(hex_warnings) > 2:
+                note += f" ({len(hex_warnings) - 2} more warning(s) in Inspect Map.)"
+            self._set_chip_state(self.chip_file, f"HEX: review {len(hex_warnings)} warning(s)", "warn")
+            self._set_guidance(
+                self.lbl_hex_guidance,
+                f"Addresses fit the selected memory map, but review: {note} "
+                "A memory-map fit does not verify target identity, wiring, or VPP.",
+                "warn",
+            )
         else:
             self._set_chip_state(self.chip_file, f"HEX: {fname}", "ok")
+            self._set_guidance(
+                self.lbl_hex_guidance,
+                f"Addresses fit the selected {self.target.display_name} memory map. "
+                "This does not verify target identity, wiring, or VPP.",
+                "ok",
+            )
 
     def _refresh_actions(self) -> None:
         busy = self.lane.busy
         conn = self.session.connected
         has_hex = self.hex_img is not None and not self.hex_img.is_empty()
+        hex_fits = False
+        if has_hex:
+            hex_fits = bool(analyze_hex_for_device(self.hex_img, self.target)["fits"])
+        target_mismatch = bool(
+            self._reported_target_name and self._reported_target_name != self.target.name
+        )
+
+        if target_mismatch:
+            reported = lookup(self._reported_target_name)
+            reported_label = reported.display_name if reported else self._reported_target_name
+            self._set_guidance(
+                self.lbl_target_guidance,
+                f"Blocked: ProgramPic last reported {reported_label}, but {self.target.display_name} is selected. "
+                "Select the reported model or query again. Raw silicon ID is not exposed.",
+                "warn",
+            )
+
+        if self.settings.auto_verify:
+            self._set_guidance(
+                self.lbl_verify_guidance,
+                "After writing: read-back comparison is enabled. This confirms data comparison only, not target identity or electrical safety.",
+                "ok",
+            )
+        else:
+            self._set_guidance(
+                self.lbl_verify_guidance,
+                "Read-back comparison is off. A completed write will not confirm that data was stored correctly.",
+                "warn",
+            )
+
+        if busy:
+            self._set_guidance(
+                self.lbl_connection_guidance,
+                "Hardware operation in progress. Board and target selection are temporarily locked.",
+            )
+        elif conn:
+            self._set_guidance(
+                self.lbl_connection_guidance,
+                f"Connected on {self.session.state.port}. Target identity and socket voltage are not independently measured by this app.",
+            )
+        elif not self.cmb_port.currentData():
+            self._set_guidance(
+                self.lbl_connection_guidance,
+                "No serial port available. Connect the Arduino by USB, then select Rescan.",
+                "warn",
+            )
+        else:
+            self._set_guidance(
+                self.lbl_connection_guidance,
+                "Confirm the selected port belongs to the Arduino, then Connect. Board selection configures wiring; it does not detect hardware.",
+            )
 
         bw = get_board_wiring(self.board_key)
         self._set_chip_state(
@@ -860,7 +990,7 @@ class MainWindow(QMainWindow):
         )
 
         # Control states
-        self.cmb_board.setEnabled(not busy)
+        self.cmb_board.setEnabled(not busy and not conn)
         self.cmb_port.setEnabled(not busy and not conn)
         self.btn_rescan.setEnabled(not busy and not conn)
         self.btn_flash_ard.setEnabled(not busy and not conn)
@@ -869,26 +999,64 @@ class MainWindow(QMainWindow):
 
         self.cmb_mcu.setEnabled(not busy)
         self.btn_detect.setEnabled(not busy and conn)
-        self.btn_blank.setEnabled(not busy and conn)
-        self.btn_read.setEnabled(not busy and conn)
-        self.btn_erase.setEnabled(not busy and conn)
+        self.btn_blank.setEnabled(not busy and conn and not target_mismatch)
+        self.btn_read.setEnabled(not busy and conn and not target_mismatch)
+        self.btn_erase.setEnabled(not busy and conn and not target_mismatch)
 
         self.btn_open_hex.setEnabled(not busy)
         self.btn_reload_hex.setEnabled(not busy and bool(self.hex_path))
-        self.btn_program.setEnabled(not busy and conn and has_hex)
-        self.btn_verify.setEnabled(not busy and conn and has_hex)
+        self.btn_program.setEnabled(not busy and conn and has_hex and hex_fits and not target_mismatch)
+        self.btn_verify.setEnabled(not busy and conn and has_hex and hex_fits and not target_mismatch)
         self.btn_cancel.setEnabled(busy)
 
+        if target_mismatch:
+            op_reason = "ProgramPic reported a different model. Resolve the target mismatch before hardware operations."
+        elif not conn:
+            op_reason = "Connect the programmer before starting a hardware operation."
+        elif not has_hex:
+            op_reason = "Load a non-empty Intel HEX file first."
+        elif not hex_fits:
+            op_reason = "The HEX contains addresses outside the selected target memory map."
+        else:
+            op_reason = ""
+        hardware_reason = (
+            "Wait for the active operation to finish." if busy else
+            "Resolve the ProgramPic report/selection mismatch first." if target_mismatch else
+            "Connect the programmer first." if not conn else ""
+        )
+        self.btn_blank.setToolTip(hardware_reason or "Check whether the selected PIC memory is blank.")
+        self.btn_read.setToolTip(hardware_reason or "Read the selected target and save a HEX backup.")
+        self.btn_erase.setToolTip(hardware_reason or "Erase user memory on the selected target. Requires hardware preflight.")
+        self.btn_program.setToolTip(op_reason or "Erase, write the selected HEX, then compare read-back when enabled in Settings.")
+        self.btn_verify.setToolTip(op_reason or "Compare the selected HEX image with target memory; this does not identify the target or measure voltage.")
+        self.btn_connect.setToolTip(
+            "Select an available serial port first." if not self.cmb_port.currentData()
+            else "Connect to the selected Arduino and check its ProgramPic handshake."
+        )
+        self.btn_detect.setToolTip(
+            "Connect the programmer first." if not conn
+            else "Ask ProgramPic to report a model. Raw silicon ID and socket voltage are not exposed to this app."
+        )
+        self.btn_erase.setToolTip(
+            "Connect the programmer first." if not conn
+            else "Erase user memory on the selected target. Requires a fresh hardware preflight."
+        )
+
         # Menu actions
+        self.act_ports.setEnabled(not busy and not conn)
         self.act_flash.setEnabled(not busy and not conn)
         self.act_connect.setEnabled(not busy and not conn)
+        self.act_settings.setEnabled(not busy)
         self.act_disconnect.setEnabled(not busy and conn)
         self.act_detect.setEnabled(not busy and conn)
-        self.act_blank.setEnabled(not busy and conn)
-        self.act_save.setEnabled(not busy and conn)
-        self.act_erase.setEnabled(not busy and conn)
-        self.act_program.setEnabled(not busy and conn and has_hex)
-        self.act_verify.setEnabled(not busy and conn and has_hex)
+        self.act_save.setEnabled(not busy and conn and not target_mismatch)
+        self.act_blank.setEnabled(not busy and conn and not target_mismatch)
+        self.act_erase.setEnabled(not busy and conn and not target_mismatch)
+        self.act_program.setEnabled(not busy and conn and has_hex and hex_fits and not target_mismatch)
+        self.act_program.setToolTip(op_reason)
+        self.act_verify.setEnabled(not busy and conn and has_hex and hex_fits and not target_mismatch)
+        self.act_verify.setToolTip(op_reason)
+        self.act_erase.setToolTip(hardware_reason or "Erase user memory on the selected target.")
 
     # ------------------------------------------------------------------
     # Logging & Background Task Runner
@@ -1069,6 +1237,8 @@ class MainWindow(QMainWindow):
             return self.session.connect(port=port, baud=baud, progress=progress)
 
         def ok(st) -> None:
+            self._reported_target_name = None
+            self.lbl_silicon_probe.setText("Programmer report: not queried for this connection")
             self.progress.setValue(100)
             self.log(
                 f"Connected to verified programmer on {st.port} — firmware v{st.firmware} "
@@ -1085,6 +1255,7 @@ class MainWindow(QMainWindow):
         if self.lane.busy:
             return
         self.session.disconnect()
+        self._reported_target_name = None
         self.lbl_silicon_probe.setText("Programmer report: disconnected")
         self.status_lbl.setText("Disconnected — verify VPP is off before handling the target")
         self.log(
@@ -1107,6 +1278,7 @@ class MainWindow(QMainWindow):
             info, matched = res
             self.progress.setValue(100)
             if matched is not None:
+                self._reported_target_name = matched.name
                 self.lbl_silicon_probe.setText(
                     f"ProgramPic reports: {matched.display_name} (raw ID/config not exposed by host)"
                 )
@@ -1127,10 +1299,14 @@ class MainWindow(QMainWindow):
                     )
                     if ans == QMessageBox.StandardButton.Yes:
                         self.cmb_mcu.setCurrentIndex(idx)
+                self.lbl_silicon_probe.setText(
+                    f"ProgramPic reports: {matched.display_name} (raw ID/config not exposed by host)"
+                )
                 self.status_lbl.setText(
                     f"Programmer reports {matched.display_name}; socket voltage not measured"
                 )
             else:
+                self._reported_target_name = None
                 label = info.device_name or "unknown"
                 self.lbl_silicon_probe.setText(
                     f"ProgramPic reports an unsupported target: {label}; not auto-selected"
@@ -1144,8 +1320,9 @@ class MainWindow(QMainWindow):
                     "Unsupported or unidentified target",
                     "The host did not return a supported PIC model. No raw device ID or config word is exposed by the upstream host command. For no-ID devices, select the exact model manually and follow its datasheet; verify wiring and VPP before any destructive action.",
                 )
+            self._refresh_actions()
 
-        self._run_task(task, ok, "Auto-Detect PIC")
+        self._run_task(task, ok, "Query Programmer for Target Model")
 
     def _program(self) -> None:
         if not self.session.connected or self.hex_img is None:

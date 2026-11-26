@@ -51,9 +51,9 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [x] Create/restore the app entry point, persistent settings, dialogs, theme, icons, and worker lane required by the workbench.
 - [x] Add test coverage for HEX parsing, backend adapter results, and SVG validity.
 - [x] Add real Qt window screenshot capture for dark/light home screens and the HEX inspector; add an Actions artifact upload step for review.
-- [x] Run the screenshot-enabled GUI integration suite on Windows after the latest copy/confirmation changes; the workflow passed in Actions run `45761718540`.
-- [x] Generate fresh real-app screenshots for dark/light no-hardware home and the HEX inspector; artifact `Arduino-PIC-Programmer-UI-screenshots` is attached to that run.
-- [ ] Visually inspect those current images for clipping, unreadable text, spacing, and misleading states. The artifact is on the Actions run; visual sign-off remains pending.
+- [x] Run the screenshot-enabled GUI integration suite on Windows after the previous copy/confirmation changes; that workflow passed in Actions run `45761718540`.
+- [x] Generate real-app screenshots for dark/light no-hardware home and the HEX inspector in that run. The current UX refinements still need a new Windows screenshot run.
+- [ ] Visually inspect those real-app images for clipping, unreadable text, spacing, and misleading states. The Actions artifact download currently fails with an EOF while fetching its signed archive; visual sign-off remains pending.
 - [ ] Test startup without hardware, settings file, or recent files; test corrupt settings and unavailable COM ports.
 - [ ] Test file open/drag-drop/save, recent files, preflight dismissal/acceptance, settings persistence, cancellation, and clean shutdown.
 - [ ] Test the UI at common Windows DPI scales and resolutions; ensure dialogs/buttons/text remain visible.
@@ -68,23 +68,29 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - A green success indicator means a named software postcondition actually passed (for example, HEX read-back comparison); it must not imply physical voltage, wiring, or safety was measured.
 - Destructive actions are visually distinct, describe erase/calibration consequences, use a safe default, and require an explicit review/confirmation that names the selected target and file.
 - Errors state what failed, what the app did/did not do, what the user should check next, and whether retrying is safe. Avoid raw tracebacks as the only user feedback.
+- Keep the visual language restrained and purposeful: strong type hierarchy, consistent spacing, a small semantic color set, and no decorative metrics, oversized labels, stock imagery, or claims that the hardware has been verified.
+
+### UX research references
+- [Microsoft desktop UX: designing for simplicity and power](https://learn.microsoft.com/en-us/windows/win32/uxguide/how-to-design-desktop-ux) — keep core tasks obvious, constrain invalid choices, and progressively disclose secondary controls.
+- [Microsoft desktop UX checklist](https://learn.microsoft.com/en-us/windows/win32/uxguide/top-violations) — make controls discoverable and errors specific, actionable, and non-blaming.
+- [Microsoft accessibility guidance](https://github.com/MicrosoftDocs/win32/blob/docs/desktop-src/uxguide/inter-accessibility.md) — preserve keyboard access and meaningful system accessibility behavior.
 
 ### Screen-by-screen review
 - [x] Replace unsupported “0 V/safe/powered off” UI claims with explicit “voltage not measured” guidance; distinguish selected target from the programmer's reported model and explain the host's raw-ID limitation.
 - [x] Make programming summaries reflect the actual read-back and calibration-preservation settings; block erase when calibration preservation is unchecked and no explicit calibration backup is supplied. Core regression tests pass.
 - [x] Rerun the Windows GUI tests after the copy/confirmation changes; the first run exposed a missing HEX-warning caveat, which was fixed. Updated Windows run `45761718540` passes.
 - [ ] Visually inspect the fresh screenshots from that run before marking UI acceptance.
-- [ ] First launch: explain the three-step setup (board/port → connect host → choose target/open HEX); show a friendly “no hardware connected” state and a discoverable firmware/setup guide.
-- [ ] Board and port card: distinguish board selection from board detection; make missing ports, rescan, busy ports, and firmware-upload limitations obvious and actionable.
-- [ ] Programmer connection: show handshake state and port/firmware separately from target identity; provide connect/disconnect progress and actionable serial errors.
-- [ ] Target card: show the selected MCU as **selected**; show a separate, clearly qualified ProgramPic-reported model. Explain that raw ID is unavailable through the host and that no-ID parts need manual marking/datasheet checks.
-- [ ] HEX card: show filename, detected memory regions, bytes/words, selected-target fit, and warnings; make out-of-range or malformed files impossible to mistake for “ready.”
-- [ ] Circuit/pinout inspector: label verified versus unverified mappings; state the selected board/target and jumper mode; make datasheet confirmation visible before destructive use.
-- [ ] Preflight and confirmation dialogs: use a short checklist with plain-language actions, show target/file/erase/write/read-back details, and make Cancel the safe default.
-- [ ] Progress/cancel: show the current operation, honest progress where known, and clear deferred-cancel wording while a serial command is finishing; never imply a command stopped before it has.
-- [ ] Success/failure: separate write completion from read-back verification; disclose when verification was disabled or failed; tell users physical socket voltage is not measured and to confirm VPP before handling the target.
-- [ ] Activity log: keep useful timestamps and severity, support copy/export/filter, avoid flooding duplicate lines, and retain enough detail to diagnose a failure without hiding the next action.
-- [ ] Settings/About/Help: explain board, baud, verification, preservation, theme, and log preferences; show app/version/support links and known hardware limitations.
+- [x] First launch: the numbered board/port → target → HEX flow is visible; no-port guidance gives the next step, and the user guide is reachable from Help.
+- [ ] Board and port card: distinguish board selection from board detection; missing ports/rescan and busy state are now explained. Still review firmware-upload limitations and behavior with a busy port.
+- [x] Programmer connection: show the selected port and handshake-reported firmware separately from target identity; show connect/disconnect state and a persistent next-step hint.
+- [x] Target card: label the MCU as selected, separate ProgramPic's reported model, disclose raw-ID limitations, and warn for no-ID/manual marking or unverified wiring. A reported-model mismatch now blocks hardware actions until resolved.
+- [x] HEX card: show filename and region counts; identify fit/mismatch inline, block Program/Verify for out-of-range images, and explain that a memory-map fit does not verify hardware identity or wiring.
+- [x] Circuit/pinout inspector: show selected board/target and jumper mode; retain explicit unverified mapping and datasheet guidance.
+- [x] Preflight and confirmation dialogs: use a checklist, describe operation consequences, and make Cancel the default/focused response.
+- [x] Progress/cancel: identify the active operation and retain deferred-cancel wording; progress is shown only when the host reports it.
+- [x] Success/failure: separate write completion from read-back comparison, disclose when comparison is disabled, and state that socket voltage is not measured.
+- [ ] Activity log: timestamps, severity, copy/export/filter are implemented; review duplicate volume and error recovery UX.
+- [ ] Settings/About/Help: links/version and settings are present; review explanations for baud, verification, calibration preservation, and known limitations.
 
 ### Accessibility, consistency, and responsive layout
 - [ ] Check keyboard-only operation: logical Tab order, visible focus, Enter/Escape behavior, useful shortcuts, and no keyboard traps in dialogs/tabs.
@@ -94,8 +100,9 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [ ] Standardize terminology, button verbs, status colors/icons, spacing, and dialog button order; remove jargon or define it at first use.
 
 ### Real-image review / visual regression
-- [x] Capture real Qt app windows (not mockups): dark no-hardware home, light no-hardware home, and dark HEX inspector. Current screenshots are in the [passing Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45761718540), artifact `Arduino-PIC-Programmer-UI-screenshots`.
-- [ ] Inspect all three images at 100% and enlarged; record findings and fix visual defects before marking UI acceptance.
+- [x] Capture real Qt app windows (not mockups): dark no-hardware home, light no-hardware home, and dark HEX inspector. Previous screenshots are in the [Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45761718540), artifact `Arduino-PIC-Programmer-UI-screenshots`.
+- [ ] Retrieve and inspect the previous Windows captures at 100% and enlarged; `gh run download` currently receives EOF from the signed artifact host.
+- [ ] Capture and inspect fresh images after the current inline-guidance/theme changes; latest code has not yet run in Windows CI.
 - [ ] Keep screenshots as a short-lived CI artifact unless approved documentation images are deliberately curated; don't commit raw build/test output accidentally.
 - [ ] Acceptance: a first-time user can identify the next safe step, understand what the app knows versus what it cannot measure, and recover from common errors without guessing.
 
@@ -124,9 +131,9 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [ ] Have a second tester follow the guide from a clean setup and capture any mismatches.
 - [ ] Acceptance: all claimed workflows and failure cases are physically verified; no unresolved high-severity safety, data-loss, or launch issue remains.
 
-## Phase 5.5 — Professional polish, support, and trust
+## Phase 5.5 — Product trust, support, and final QA
 
-- [ ] Review actual CI-generated UI screenshots for the main screen in dark/light themes and a HEX-inspector state; fix clipping, unreadable text, awkward spacing, and stale/unverified hardware claims. Artifact is in Actions run `45761718540` as `Arduino-PIC-Programmer-UI-screenshots`.
+- [ ] Review actual UI screenshots from the previous Windows run (artifact download currently ends with EOF), then capture fresh dark/light and HEX-inspector screenshots after the current changes; review clipping, spacing, text legibility, and hardware-state claims.
 - [ ] Verify empty/no-hardware, disconnected, loading, failure, success, and destructive-confirmation UI states; ensure errors are actionable and success is never reported prematurely.
 - [ ] Review keyboard navigation, accessible names/focus order, high-DPI scaling, minimum window size, and common 100%/150%/200% Windows display scales.
 - [ ] Verify app branding: final product name/version, executable metadata/icon, support URL, About dialog, and no development suffix in a release build.
@@ -150,17 +157,17 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 
 ## Verification run so far
 
-- `python -m compileall -q src app`: passed.
-- `PYTHONPATH=src .venv/bin/python -m pytest -q src/tests/test_ihex.py src/tests/test_programmer_adapter.py src/tests/test_svg.py src/tests/test_safety.py`: **18 passed**, including truthful status/confirmation and verification-disabled result tests.
+- `python -m compileall -q src app`: passed after the current UX changes.
+- `PYTHONPATH=src .venv/bin/python -m pytest -q src/tests/test_ihex.py src/tests/test_programmer_adapter.py src/tests/test_svg.py src/tests/test_safety.py`: **18 passed** locally.
+- Current GUI integration tests cannot run in this Linux sandbox: PySide6 imports fail because system `libGL.so.1` is absent. The Windows GUI assertions added for HEX range blocking and reported-target mismatch still need CI execution.
 - `bash packaging/build_host_posix.sh`: built the upstream C++ helper into ignored `tools/ardpicprog`; CLI help smoke test passed.
 - `git diff --check`: passed on the current changes.
 - PyInstaller spec path was corrected after an initial failed attempt. A Linux packaging attempt is still blocked because the sandbox Python lacks `libpython3.11.so.1.0`; this is not a Windows build result.
-- Current local environment cannot run Qt tests: this recreated `.venv` has pytest/pyserial installed but not PySide6; a prior Qt import attempt also hit missing system `libGL.so.1`. Windows CI run `45761077739` exposed a missing HEX-warning caveat; it was fixed, and rerun `45761718540` passes the screenshot-enabled GUI suite.
 - Windows CI passed for commit `f7638be` in Actions run `45761718540`; it produced the candidate ZIP, CI-checked SHA-256 sidecar, JUnit test report, and fresh UI screenshots. These are temporary Actions artifacts, not a published Release. No clean-machine Windows launch or physical hardware test has been performed.
 
 ## Remaining release blockers
 
-- [x] Successfully run the Windows build/test workflow after the UX changes and produce updated artifacts (run `45761718540`).
+- [x] Previously run the Windows build/test workflow after the copy/safety pass (run `45761718540`); the newer inline-guidance, mismatch-gating, and theme changes still need Windows CI.
 - [ ] Physically validate the adapter and safety behavior with supported hardware.
 - [ ] Publish and test a real GitHub Release asset.
 
