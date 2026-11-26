@@ -12,7 +12,9 @@ from PySide6.QtGui import (
     QDesktopServices,
     QDragEnterEvent,
     QDropEvent,
+    QFontMetrics,
     QKeySequence,
+    QPixmap,
 )
 from PySide6.QtWidgets import (
     QApplication,
@@ -31,6 +33,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSplitter,
     QToolBar,
     QToolButton,
@@ -61,6 +64,35 @@ ARDPICPROG_URL = "https://github.com/Ho-Ro/ArdPicProg"
 QPICKIT_URL = "https://github.com/Ho-Ro/QPICkit"
 
 
+class StatusChip(QLabel):
+    """Compact, accessible status label that keeps its full text in a tooltip."""
+
+    def __init__(self, max_width: int, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._full_text = ""
+        self.setMinimumWidth(88)
+        self.setMaximumWidth(max_width)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+
+    def set_full_text(self, text: str) -> None:
+        self._full_text = text
+        self.setToolTip(text)
+        self.setAccessibleDescription(text)
+        self._refresh_elision()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._refresh_elision()
+
+    def _refresh_elision(self) -> None:
+        available = max(48, self.contentsRect().width() - 16)
+        self.setText(
+            QFontMetrics(self.font()).elidedText(
+                self._full_text, Qt.TextElideMode.ElideRight, available
+            )
+        )
+
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -79,8 +111,8 @@ class MainWindow(QMainWindow):
         self._preflight_verified_pairs: Set[Tuple[str, str]] = set()
 
         self.setWindowTitle(f"{APP_NAME}  ·  v{VERSION}")
-        self.setMinimumSize(1160, 740)
-        self.resize(1340, 840)
+        self.setMinimumSize(1000, 620)
+        self.resize(1280, 700)
         self.setAcceptDrops(True)
 
         self._build_ui()
@@ -92,7 +124,9 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(geo)
         st = self.settings.window_state
         if st is not None:
+            saved_log_visibility = self.settings.log_visible
             self.restoreState(st)
+            self._toggle_log(saved_log_visibility)
 
         self._refresh_ports()
         self._sync_inspector()
@@ -120,7 +154,25 @@ class MainWindow(QMainWindow):
         header.setObjectName("headerBar")
         hl = QHBoxLayout(header)
         hl.setContentsMargins(16, 10, 16, 10)
-        hl.setSpacing(10)
+        hl.setSpacing(8)
+
+        self.brand_icon = QLabel()
+        self.brand_icon.setObjectName("brandIcon")
+        self.brand_icon.setAccessibleName("Arduino-PIC Programmer logo")
+        self.brand_icon.setFixedSize(44, 44)
+        self.brand_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        app_root = (
+            Path(sys._MEIPASS)
+            if getattr(sys, "frozen", False)
+            else Path(__file__).resolve().parents[2]
+        )
+        logo = QPixmap(str(app_root / "assets" / "app-icon.ico"))
+        if not logo.isNull():
+            self.brand_icon.setPixmap(logo.scaled(
+                42, 42, Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            ))
+        hl.addWidget(self.brand_icon, 0, Qt.AlignmentFlag.AlignVCenter)
 
         title_col = QVBoxLayout()
         title_col.setSpacing(1)
@@ -135,13 +187,19 @@ class MainWindow(QMainWindow):
         hl.addLayout(title_col)
         hl.addStretch()
 
-        self.chip_board = QLabel()
-        self.chip_prog = QLabel()
-        self.chip_target = QLabel()
-        self.chip_file = QLabel()
-        for ch in (self.chip_board, self.chip_prog, self.chip_target, self.chip_file):
-            ch.setObjectName("chip")
-            hl.addWidget(ch)
+        self.chip_board = StatusChip(190)
+        self.chip_prog = StatusChip(190)
+        self.chip_target = StatusChip(210)
+        self.chip_file = StatusChip(190)
+        for chip, name in (
+            (self.chip_board, "Selected Arduino board"),
+            (self.chip_prog, "Programmer connection status"),
+            (self.chip_target, "Selected PIC target"),
+            (self.chip_file, "Loaded HEX file status"),
+        ):
+            chip.setObjectName("chip")
+            chip.setAccessibleName(name)
+            hl.addWidget(chip, 1)
         outer.addWidget(header)
 
         # ---- 2. Main Two-Column Splitter ----
@@ -154,7 +212,7 @@ class MainWindow(QMainWindow):
         left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         left_scroll.setFrameShape(QFrame.Shape.NoFrame)
         left_scroll.setMinimumWidth(490)
-        left_scroll.setMaximumWidth(610)
+        left_scroll.setMaximumWidth(600)
 
         left_body = QWidget()
         left_body.setObjectName("leftWorkbench")
@@ -183,7 +241,7 @@ class MainWindow(QMainWindow):
         self.main_split.addWidget(right_wrap)
         self.main_split.setStretchFactor(0, 0)
         self.main_split.setStretchFactor(1, 1)
-        self.main_split.setSizes([510, 830])
+        self.main_split.setSizes([480, 800])
         outer.addWidget(self.main_split, 1)
 
         # ---- 3. Bottom Progress & Action Status Bar ----
@@ -748,6 +806,7 @@ class MainWindow(QMainWindow):
         self.act_log.blockSignals(True)
         self.act_log.setChecked(visible)
         self.act_log.blockSignals(False)
+        self.settings.log_visible = visible
 
     # ------------------------------------------------------------------
     # State Synchronization & Selectors
@@ -758,11 +817,16 @@ class MainWindow(QMainWindow):
             "warn": "chipWarn",
             "bad": "chipBad",
         }.get(variant, "chip")
-        lbl.setText(text)
+        if isinstance(lbl, StatusChip):
+            lbl.set_full_text(text)
+        else:
+            lbl.setText(text)
         if lbl.objectName() != obj:
             lbl.setObjectName(obj)
             lbl.style().unpolish(lbl)
             lbl.style().polish(lbl)
+            if isinstance(lbl, StatusChip):
+                lbl._refresh_elision()
 
     @staticmethod
     def _set_guidance(lbl: QLabel, text: str, variant: str = "neutral") -> None:
@@ -1069,10 +1133,6 @@ class MainWindow(QMainWindow):
             "Connect first. This asks ProgramPic to report a model; Raw silicon ID and socket voltage are not exposed."
             if not conn else
             "Ask ProgramPic to report a model. Raw silicon ID and socket voltage are not exposed to this app."
-        )
-        self.btn_erase.setToolTip(
-            "Connect the programmer first." if not conn
-            else "Erase user memory on the selected target. Requires a fresh hardware preflight."
         )
 
         # Menu actions
