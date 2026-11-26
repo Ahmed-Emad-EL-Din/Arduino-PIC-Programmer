@@ -2,11 +2,12 @@ import sys
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from core.ihex import HexImage
 from core.mcu_db import DEFAULT_DEVICE
 from core.programmer import ProgrammerSession
-from core.protocol import ProtocolError
+from core.protocol import ProgrammerState, ProtocolError
 
 
 class TestProgrammerAdapter(unittest.TestCase):
@@ -41,6 +42,26 @@ class TestProgrammerAdapter(unittest.TestCase):
         info, dev = self.session.detect_chip()
         self.assertEqual(info.device_name, "PIC16F84A")
         self.assertEqual(dev, DEFAULT_DEVICE)
+
+    def test_program_result_does_not_claim_verification_when_disabled(self):
+        self.session.state = ProgrammerState(port="FAKEPORT", verified=True)
+        with patch.object(self.session, "_checked", return_value="program command completed"), \
+             patch.object(self.session, "_readback") as readback:
+            result = self.session.program_hex(
+                HexImage.from_flat({0: 0x1234}),
+                DEFAULT_DEVICE,
+                do_verify=False,
+            )
+        self.assertIn("read-back comparison was disabled and not performed", result)
+        readback.assert_not_called()
+
+    def test_program_result_reports_successful_readback_when_enabled(self):
+        self.session.state = ProgrammerState(port="FAKEPORT", verified=True)
+        image = HexImage.from_flat({0: 0x1234})
+        with patch.object(self.session, "_checked", return_value="program command completed"), \
+             patch.object(self.session, "_readback", return_value=image):
+            result = self.session.program_hex(image, DEFAULT_DEVICE, do_verify=True)
+        self.assertIn("read-back comparison passed", result)
 
     def test_readback_comparison_rejects_mismatch(self):
         different = HexImage.from_flat({0: 0x1235})

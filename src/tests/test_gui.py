@@ -53,6 +53,9 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertIsNotNone(self.win.log_pane)
         self.assertIsNotNone(self.win.cmb_board)
         self.assertIsNotNone(self.win.cmb_mcu)
+        self.assertIn("not measured", self.win.status_lbl.text())
+        self.assertIn("Raw silicon ID", self.win.btn_detect.toolTip())
+        self.assertIn("Target selected:", self.win.chip_target.text())
         capture_window(self.win, "main-dark-no-hardware.png")
 
     def test_circuit_panel_tabs(self):
@@ -77,6 +80,10 @@ class TestGUIIntegration(unittest.TestCase):
         self.win._refresh_actions()
         self.win.circuit_panel.set_hex_image(img)
         self.win.circuit_panel.tabs.setCurrentIndex(2)
+        self.assertIn(
+            "does not verify target identity",
+            self.win.circuit_panel.hex_summary_lbl.text(),
+        )
         capture_window(self.win, "hex-inspector-dark.png")
 
     def test_dialogs_instantiation(self):

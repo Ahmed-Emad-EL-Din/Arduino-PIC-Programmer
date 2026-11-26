@@ -212,7 +212,7 @@ class MainWindow(QMainWindow):
         psl.setContentsMargins(16, 6, 16, 6)
         psl.setSpacing(10)
 
-        self.status_lbl = QLabel("Idle — socket unpowered (0 V safe state)")
+        self.status_lbl = QLabel("Idle — hardware state not measured")
         self.status_lbl.setObjectName("muted")
         psl.addWidget(self.status_lbl, 2)
 
@@ -368,8 +368,11 @@ class MainWindow(QMainWindow):
         self.cmb_mcu.currentIndexChanged.connect(self._on_mcu_changed)
         mcu_row.addWidget(self.cmb_mcu, 1)
 
-        self.btn_detect = QPushButton("Auto-Detect")
-        self.btn_detect.setToolTip("Probe silicon Device ID (0x2006) via programmer")
+        self.btn_detect = QPushButton("Query Programmer")
+        self.btn_detect.setToolTip(
+            "Ask ProgramPic to report the target model. Raw silicon ID and socket voltage "
+            "are not exposed to this app."
+        )
         self.btn_detect.clicked.connect(self._detect)
         mcu_row.addWidget(self.btn_detect)
         lay.addLayout(mcu_row)
@@ -383,7 +386,7 @@ class MainWindow(QMainWindow):
         self.lbl_mcu_specs = QLabel()
         self.lbl_mcu_specs.setObjectName("monoSmall")
         self.lbl_mcu_specs.setWordWrap(True)
-        self.lbl_silicon_probe = QLabel("Detected silicon: not probed yet")
+        self.lbl_silicon_probe = QLabel("Programmer report: not queried yet")
         self.lbl_silicon_probe.setObjectName("muted")
         sbl.addWidget(self.lbl_mcu_specs)
         sbl.addWidget(self.lbl_silicon_probe)
@@ -852,8 +855,8 @@ class MainWindow(QMainWindow):
         mode_lbl = f"JP3={pw.jp3_position}" if pw.uses_zif else "ICSP"
         self._set_chip_state(
             self.chip_target,
-            f"Target: {self.target.display_name} ({mode_lbl})",
-            "ok" if conn else "neutral",
+            f"Target selected: {self.target.display_name} ({mode_lbl})",
+            "neutral",
         )
 
         # Control states
@@ -1072,9 +1075,7 @@ class MainWindow(QMainWindow):
                 f"({len(st.supported)} devices supported).",
                 "OK",
             )
-            self.status_lbl.setText(
-                f"Connected: ProgramPic v{st.firmware} on {st.port} (0 V idle)"
-            )
+            self.status_lbl.setText("Programmer connected; socket voltage not measured")
             self.apply_theme(self.settings.theme, self.settings.font_size)
             self._refresh_actions()
 
@@ -1084,9 +1085,12 @@ class MainWindow(QMainWindow):
         if self.lane.busy:
             return
         self.session.disconnect()
-        self.lbl_silicon_probe.setText("Detected silicon: disconnected")
-        self.status_lbl.setText("Disconnected — socket unpowered (0 V safe state)")
-        self.log("Programmer disconnected cleanly (socket powered off).", "INFO")
+        self.lbl_silicon_probe.setText("Programmer report: disconnected")
+        self.status_lbl.setText("Disconnected — verify VPP is off before handling the target")
+        self.log(
+            "Disconnected from the host. Socket voltage is not measured by this app; verify VPP is off before handling the target.",
+            "INFO",
+        )
         self.apply_theme(self.settings.theme, self.settings.font_size)
         self._refresh_actions()
 
@@ -1107,22 +1111,25 @@ class MainWindow(QMainWindow):
                     f"ProgramPic reports: {matched.display_name} (raw ID/config not exposed by host)"
                 )
                 self.log(
-                    f"ProgramPic host identified {matched.display_name}; destructive operations will re-check target identity.",
+                    f"ProgramPic reports {matched.display_name}. The host does not expose raw ID/config values to this app; confirm the package marking and selected target before programming.",
                     "OK",
                 )
                 idx = self.cmb_mcu.findData(matched.name)
                 if idx >= 0 and idx != self.cmb_mcu.currentIndex():
                     ans = QMessageBox.question(
                         self,
-                        "Silicon detected",
-                        f"Detected {matched.display_name} in socket (currently selected: "
-                        f"{self.target.display_name}).\n\nSwitch Target MCU to {matched.display_name}?",
+                        "Programmer-reported target",
+                        f"ProgramPic reports {matched.display_name}, while the selected target is "
+                        f"{self.target.display_name}.\n\nSwitch the target selection to "
+                        f"{matched.display_name}? The app does not receive raw silicon ID values.",
                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                         QMessageBox.StandardButton.Yes,
                     )
                     if ans == QMessageBox.StandardButton.Yes:
                         self.cmb_mcu.setCurrentIndex(idx)
-                self.status_lbl.setText(f"Detected {matched.display_name} — socket returned to 0 V")
+                self.status_lbl.setText(
+                    f"Programmer reports {matched.display_name}; socket voltage not measured"
+                )
             else:
                 label = info.device_name or "unknown"
                 self.lbl_silicon_probe.setText(
@@ -1152,7 +1159,12 @@ class MainWindow(QMainWindow):
             return
 
         if self.settings.confirm_erase or not do_verify:
-            summary = build_summary(dev, img)
+            summary = build_summary(
+                dev,
+                img,
+                do_verify=do_verify,
+                preserve_calibration=self.chk_preserve_cal.isChecked(),
+            )
             fname = Path(self.hex_path).name if self.hex_path else "memory_buffer.hex"
             if not confirm_program(self, dev, fname, summary, do_verify):
                 self.log("Programming cancelled by user.", "WARN")
@@ -1170,11 +1182,26 @@ class MainWindow(QMainWindow):
 
         def ok(summary_text: str) -> None:
             self.progress.setValue(100)
-            self.log(f"Programming complete — {dev.display_name} verified & powered off.", "OK")
-            self.status_lbl.setText(
-                f"SUCCESS — {dev.display_name} programmed & verified (0 V safe state)"
+            if do_verify:
+                self.log(
+                    f"Programming finished — read-back comparison passed for {dev.display_name}.",
+                    "OK",
+                )
+                status = f"Read-back passed for {dev.display_name}"
+                title = "Read-back verification passed"
+            else:
+                self.log(
+                    f"Programming command finished for {dev.display_name}; read-back comparison was disabled and not performed.",
+                    "WARN",
+                )
+                status = f"Write finished for {dev.display_name}; verification skipped"
+                title = "Programming finished — verification skipped"
+            self.status_lbl.setText(status + "; socket voltage not measured")
+            QMessageBox.information(
+                self,
+                title,
+                summary_text + "\n\nThe app does not measure socket voltage. Verify VPP is off before handling the target.",
             )
-            QMessageBox.information(self, "Programming Successful", summary_text)
 
         self._run_task(task, ok, f"Program {dev.display_name}")
 
@@ -1260,7 +1287,9 @@ class MainWindow(QMainWindow):
                 self.hex_path = path
                 self._refresh_hex_summary()
                 self.log(f"Saved {dev.display_name} readout to {path}", "OK")
-                self.status_lbl.setText(f"Saved backup: {Path(path).name} (0 V safe state)")
+                self.status_lbl.setText(
+                    f"Saved backup: {Path(path).name}; socket voltage not measured"
+                )
             else:
                 self.log(
                     f"Read {dev.display_name} into HEX Memory Map buffer (file save skipped).",
@@ -1274,12 +1303,12 @@ class MainWindow(QMainWindow):
         if not self.session.connected:
             return
         dev = self.target
-        if not confirm_erase(self, dev):
-            self.log("Bulk erase cancelled.", "WARN")
+        preserve = self.chk_preserve_cal.isChecked()
+        if not confirm_erase(self, dev, preserve_calibration=preserve):
+            self.log("Bulk erase cancelled or blocked by calibration-preservation safety gate.", "WARN")
             return
         if not self._ensure_preflight():
             return
-        preserve = self.chk_preserve_cal.isChecked()
 
         def task(progress, pct, _cancel):
             return self.session.erase_chip(
@@ -1322,7 +1351,9 @@ class MainWindow(QMainWindow):
             f"Host Arduino Board:  {bw.board_name} ({bw.mcu_label})\n"
             f"Programmer Port:     {st.port or '(disconnected)'}\n"
             f"Programmer Firmware: {st.firmware or '—'}\n"
-            f"Verified Link:       {'YES' if st.verified else 'NO'}\n\n"
+            f"Host Handshake:      {'Passed' if st.verified else 'Not connected'}\n"
+            f"Raw target ID:       Not exposed by host\n"
+            f"Socket voltage:      Not measured by app\n\n"
             f"Target PIC MCU:      {self.target.display_name} ({pw.package})\n"
             f"Hardware Mode:       {'ZIF-18 Socket (JP3 = ' + str(pw.jp3_position) + ')' if pw.uses_zif else '6-Wire External ICSP'}\n"
             f"Program Flash:       {self.target.program_words} words (14-bit)\n"
@@ -1362,8 +1393,8 @@ class MainWindow(QMainWindow):
             ans = QMessageBox.question(
                 self,
                 "Hardware operation running",
-                "A programming or read operation is still running.\n"
-                "Abort operation, power off the socket, and exit?",
+                "A hardware operation is still running.\n"
+                "Request cancellation and wait for the host to finish its current command before exiting?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -1377,7 +1408,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(
                     self,
                     "Operation still running",
-                    "The hardware command has not finished. The application will stay open rather than force-stop a serial write. Wait for the operation to finish, confirm the programmer is in a safe state, then close again.",
+                    "The hardware command has not finished. The application will stay open rather than force-stop a serial write. Wait for the operation to finish. Before handling the target, independently verify that the external VPP supply is off; this app cannot measure socket voltage.",
                 )
                 ev.ignore()
                 return

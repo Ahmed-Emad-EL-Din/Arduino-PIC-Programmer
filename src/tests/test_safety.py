@@ -2,7 +2,15 @@ import unittest
 
 from core.mcu_db import lookup
 from core.protocol import DeviceInfo
-from core.safety import SafetyViolation, build_dynamic_preflight, gate_device_match
+from core.ihex import HexImage
+from core.safety import (
+    SafetyViolation,
+    build_dynamic_preflight,
+    build_summary,
+    confirm_erase_text,
+    confirm_program_text,
+    gate_device_match,
+)
 
 
 class TestSafetyGates(unittest.TestCase):
@@ -30,6 +38,37 @@ class TestSafetyGates(unittest.TestCase):
         manual = next(item for item in items if item.id == "manual_no_id")
         self.assertTrue(manual.critical)
         self.assertIn("cannot electronically distinguish", manual.text)
+
+    def test_program_confirmation_summary_is_truthful_about_verification_and_voltage(self):
+        device = lookup("pic12f675")
+        image = HexImage.from_flat({0: 0x1234})
+        summary = build_summary(
+            device,
+            image,
+            do_verify=False,
+            preserve_calibration=False,
+        )
+        self.assertIn("read-back verify disabled", summary)
+        self.assertIn("Calibration:     Preservation disabled", summary)
+        self.assertIn("raw target ID and socket voltage are not exposed", summary)
+        self.assertIn("verify the external VPP supply is off", summary)
+        self.assertNotIn("0 V", summary)
+
+    def test_destructive_confirmation_copy_does_not_claim_measured_safe_voltage(self):
+        device = lookup("pic12f675")
+        _, erase_text = confirm_erase_text(device)
+        _, program_text = confirm_program_text(
+            device,
+            "test.hex",
+            do_verify=False,
+            preserve_calibration=False,
+        )
+        for text in (erase_text, program_text):
+            self.assertIn("not exposed", text)
+            self.assertIn("cannot measure socket voltage", text)
+            self.assertNotIn("0 V", text)
+        self.assertIn("read-back comparison is disabled", program_text)
+        self.assertIn("calibration preservation is disabled", program_text)
 
     def test_unknown_pinout_is_called_out_in_preflight(self):
         items = build_dynamic_preflight(lookup("pic16f883"), "uno")

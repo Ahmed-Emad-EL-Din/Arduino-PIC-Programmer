@@ -606,7 +606,8 @@ class CircuitPanel(QWidget):
             self.hex_summary_lbl.setText(" · ".join(warns))
         else:
             self.hex_summary_lbl.setText(
-                f"HEX image fits {dev.display_name} cleanly — ready for verified programming."
+                f"HEX addresses fit the {dev.display_name} memory map. "
+                "This check does not verify target identity, wiring, or VPP."
             )
 
         # Render formatted 8-words-per-row flat memory table (capped for instant UI)
