@@ -55,7 +55,33 @@ jobs:
           PYTHONPATH: "${{ github.workspace }}/src;${{ github.workspace }}"
         run: |
           python -m compileall -q src app
-          python -m pytest -q
+          if ($LASTEXITCODE -ne 0) { throw 'Python compileall failed.' }
+          New-Item -ItemType Directory -Force 'test-results' | Out-Null
+          python -m pytest -q --junitxml=test-results/junit.xml
+          $TestExit = $LASTEXITCODE
+          if ($TestExit -ne 0 -and (Test-Path 'test-results/junit.xml')) {
+            [xml]$Report = Get-Content 'test-results/junit.xml' -Raw
+            $FailureNodes = $Report.SelectNodes('//failure | //error')
+            $Details = ($FailureNodes | ForEach-Object {
+              $Case = $_.ParentNode
+              $Text = ($_.GetAttribute('message') + ' ' + $_.InnerText) -replace '\s+', ' '
+              "$($Case.GetAttribute('classname')).$($Case.GetAttribute('name')): $Text"
+            }) -join ' | '
+            if ($Details.Length -gt 2000) { $Details = $Details.Substring(0, 2000) }
+            "### Pytest failure`n`n$Details" | Add-Content $env:GITHUB_STEP_SUMMARY
+            Write-Output "::error title=Pytest failure::$Details"
+          }
+          if ($TestExit -ne 0) { exit $TestExit }
+          'Python compileall and pytest passed.' | Add-Content $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload test report for review
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Arduino-PIC-Programmer-test-report
+          path: test-results/junit.xml
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload real Qt UI screenshots for review
         if: always()

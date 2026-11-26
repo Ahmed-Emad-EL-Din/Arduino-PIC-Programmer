@@ -597,16 +597,20 @@ class CircuitPanel(QWidget):
 
         warns = list(diag.get("warnings", []))
         errs = list(diag.get("out_of_range", []))
+        hardware_note = (
+            "Memory-map check only; it does not verify target identity, wiring, or VPP."
+        )
         if errs:
-            self.hex_summary_lbl.setText(
+            summary = (
                 f"⚠ Out-of-range addresses detected for {dev.display_name} "
                 f"({len(errs)} word(s), first at 0x{errs[0]:04X}). Select the matching PIC MCU."
             )
+            self.hex_summary_lbl.setText(summary + "\n" + hardware_note)
         elif warns:
-            self.hex_summary_lbl.setText(" · ".join(warns))
+            self.hex_summary_lbl.setText(" · ".join(warns) + "\n" + hardware_note)
         else:
             self.hex_summary_lbl.setText(
-                f"HEX image fits {dev.display_name} cleanly — ready for verified programming."
+                f"HEX addresses fit the {dev.display_name} memory map.\n" + hardware_note
             )
 
         # Render formatted 8-words-per-row flat memory table (capped for instant UI)

@@ -51,12 +51,59 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [x] Create/restore the app entry point, persistent settings, dialogs, theme, icons, and worker lane required by the workbench.
 - [x] Add test coverage for HEX parsing, backend adapter results, and SVG validity.
 - [x] Add real Qt window screenshot capture for dark/light home screens and the HEX inspector; add an Actions artifact upload step for review.
-- [x] Run the screenshot-enabled GUI integration suite on Windows; tests passed and screenshot artifact was uploaded from Actions run `45729144989`.
-- [ ] Visually inspect the generated image files for clipping, unreadable text, spacing, and misleading states; the artifact is available from that Actions run.
+- [x] Run the screenshot-enabled GUI integration suite on Windows after the current UX refinements; the final workflow passed in Actions run `45807577569`.
+- [x] Generate fresh real-app screenshots for dark/light no-hardware home and the HEX inspector; artifact `Arduino-PIC-Programmer-UI-screenshots` is attached to that run.
+- [ ] Visually inspect those images for clipping, unreadable text, spacing, and misleading states. Downloading the signed artifact archive still fails with EOF; visual sign-off remains pending.
 - [ ] Test startup without hardware, settings file, or recent files; test corrupt settings and unavailable COM ports.
 - [ ] Test file open/drag-drop/save, recent files, preflight dismissal/acceptance, settings persistence, cancellation, and clean shutdown.
 - [ ] Test the UI at common Windows DPI scales and resolutions; ensure dialogs/buttons/text remain visible.
 - [ ] Acceptance: clean Windows runner passes all automated tests; application launches with no console and without hardware connected.
+
+## Phase 3.5 — Detailed UX improvement and visual acceptance
+
+### UX principles (must hold in every screen and dialog)
+- Selected board/target, programmer-reported model, raw measured silicon ID, and physical voltage are distinct concepts. Label each honestly; never make a selected value look detected or measured.
+- No UI text may say the socket is at 0 V, unpowered, safe, or physically verified unless hardware actually reports that measurement. The current host does not expose socket voltage or raw ID/config words.
+- Every enabled action explains its preconditions; every disabled action has a concise reason. Show one clear next step for no-port, disconnected, no-HEX, unsupported-target, and busy states.
+- A green success indicator means a named software postcondition actually passed (for example, HEX read-back comparison); it must not imply physical voltage, wiring, or safety was measured.
+- Destructive actions are visually distinct, describe erase/calibration consequences, use a safe default, and require an explicit review/confirmation that names the selected target and file.
+- Errors state what failed, what the app did/did not do, what the user should check next, and whether retrying is safe. Avoid raw tracebacks as the only user feedback.
+- Keep the visual language restrained and purposeful: strong type hierarchy, consistent spacing, a small semantic color set, and no decorative metrics, oversized labels, stock imagery, or claims that the hardware has been verified.
+
+### UX research references
+- [Microsoft desktop UX: designing for simplicity and power](https://learn.microsoft.com/en-us/windows/win32/uxguide/how-to-design-desktop-ux) — keep core tasks obvious, constrain invalid choices, and progressively disclose secondary controls.
+- [Microsoft desktop UX checklist](https://learn.microsoft.com/en-us/windows/win32/uxguide/top-violations) — make controls discoverable and errors specific, actionable, and non-blaming.
+- [Microsoft accessibility guidance](https://github.com/MicrosoftDocs/win32/blob/docs/desktop-src/uxguide/inter-accessibility.md) — preserve keyboard access and meaningful system accessibility behavior.
+
+### Screen-by-screen review
+- [x] Replace unsupported “0 V/safe/powered off” UI claims with explicit “voltage not measured” guidance; distinguish selected target from the programmer's reported model and explain the host's raw-ID limitation.
+- [x] Make programming summaries reflect the actual read-back and calibration-preservation settings; block erase when calibration preservation is unchecked and no explicit calibration backup is supplied. Core regression tests pass.
+- [x] Rerun the Windows GUI tests after the copy/confirmation changes; the first run exposed a missing HEX-warning caveat, which was fixed. Updated Windows run `45761718540` passes.
+- [ ] Visually inspect the fresh screenshots from that run before marking UI acceptance.
+- [x] First launch: the numbered board/port → target → HEX flow is visible; no-port guidance gives the next step, and the user guide is reachable from Help.
+- [ ] Board and port card: distinguish board selection from board detection; missing ports/rescan and busy state are now explained. Still review firmware-upload limitations and behavior with a busy port.
+- [x] Programmer connection: show the selected port and handshake-reported firmware separately from target identity; show connect/disconnect state and a persistent next-step hint.
+- [x] Target card: label the MCU as selected, separate ProgramPic's reported model, disclose raw-ID limitations, and warn for no-ID/manual marking or unverified wiring. A reported-model mismatch now blocks hardware actions until resolved.
+- [x] HEX card: show filename and region counts; identify fit/mismatch inline, block Program/Verify for out-of-range images, and explain that a memory-map fit does not verify hardware identity or wiring.
+- [x] Circuit/pinout inspector: show selected board/target and jumper mode; retain explicit unverified mapping and datasheet guidance.
+- [x] Preflight and confirmation dialogs: use a checklist, describe operation consequences, and make Cancel the default/focused response.
+- [x] Progress/cancel: identify the active operation and retain deferred-cancel wording; progress is shown only when the host reports it.
+- [x] Success/failure: separate write completion from read-back comparison, disclose when comparison is disabled, and state that socket voltage is not measured.
+- [ ] Activity log: timestamps, severity, copy/export/filter are implemented; review duplicate volume and error recovery UX.
+- [ ] Settings/About/Help: links/version and settings are present; review explanations for baud, verification, calibration preservation, and known limitations.
+
+### Accessibility, consistency, and responsive layout
+- [ ] Check keyboard-only operation: logical Tab order, visible focus, Enter/Escape behavior, useful shortcuts, and no keyboard traps in dialogs/tabs.
+- [ ] Give controls accessible names and meaningful tooltips; do not rely on color alone for status or severity.
+- [ ] Check text contrast in dark and light themes, minimum readable font sizes, high-DPI scaling, and no clipped controls at 100%, 150%, and 200% Windows scaling.
+- [ ] Check minimum-size and resized layouts with the activity log both shown and hidden; controls and status must remain reachable without horizontal scrolling.
+- [ ] Standardize terminology, button verbs, status colors/icons, spacing, and dialog button order; remove jargon or define it at first use.
+
+### Real-image review / visual regression
+- [x] Capture real Qt app windows (not mockups): dark no-hardware home, light no-hardware home, and dark HEX inspector. Fresh screenshots are in the [passing Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45807577569), artifact `Arduino-PIC-Programmer-UI-screenshots`.
+- [ ] Download and inspect the fresh Windows captures at 100% and enlarged. `gh run download` currently receives EOF from the signed artifact host.
+- [ ] Keep screenshots as a short-lived CI artifact unless approved documentation images are deliberately curated; don't commit raw build/test output accidentally.
+- [ ] Acceptance: a first-time user can identify the next safe step, understand what the app knows versus what it cannot measure, and recover from common errors without guessing.
 
 ## Phase 4 — Firmware and Windows packaging
 
@@ -65,7 +112,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [x] Add `packaging/build_firmware.ps1` to compile board-specific ProgramPic images and stage avrdude/configuration for packaging.
 - [x] Add a Windows GitHub Actions candidate-build workflow that compiles, tests, packages, checks required files, and uploads a short-lived candidate artifact.
 - [x] Build the upstream ArdPicProg POSIX host locally and confirm its CLI help starts; this is only a source smoke test, not a Windows build.
-- [x] Run the Windows workflow for commit `addb7648fefc9471ec7d2e9b688dbcef0a0319ab`; it completed successfully with passing tests, firmware compilation, packaging, required-file checks, screenshots, and generated/validated ZIP checksum (Actions run `45729144989`).
+- [x] Run the Windows workflow for commit `f7638bed1f681e50c47502de97f4911dfcfe6f51`; it completed successfully with passing tests, firmware compilation, packaging, required-file checks, screenshots, test report, and generated/validated ZIP checksum (Actions run `45761718540`).
 - [x] Produce the portable onedir candidate artifact with `Arduino-PIC-Programmer.exe` at the package root; CI confirmed the executable and core bundled host/avrdude/firmware files exist. Clean-machine launch remains unverified (Phase 5).
 - [ ] Verify `ardpicprog.exe`, avrdude, its config and adjacent DLLs, all firmware images, Qt plugins, docs, and notices exist in the built package.
 - [ ] Verify bootloader handling for Uno/Nano/Mega/5V Pro Mini. Leonardo/Micro flashing through this dialog is explicitly unsupported until their bootloader port-reset flow is implemented; do not claim those upload paths work.
@@ -83,9 +130,9 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [ ] Have a second tester follow the guide from a clean setup and capture any mismatches.
 - [ ] Acceptance: all claimed workflows and failure cases are physically verified; no unresolved high-severity safety, data-loss, or launch issue remains.
 
-## Phase 5.5 — Professional polish, support, and trust
+## Phase 5.5 — Product trust, support, and final QA
 
-- [ ] Review actual CI-generated UI screenshots for the main screen in dark/light themes and a HEX-inspector state; fix clipping, unreadable text, awkward spacing, and stale/unverified hardware claims. Artifact is in Actions run `45729144989` as `Arduino-PIC-Programmer-UI-screenshots`.
+- [ ] Review actual UI screenshots from passing Windows run `45807577569` (artifact download currently ends with EOF); review clipping, spacing, text legibility, and hardware-state claims.
 - [ ] Verify empty/no-hardware, disconnected, loading, failure, success, and destructive-confirmation UI states; ensure errors are actionable and success is never reported prematurely.
 - [ ] Review keyboard navigation, accessible names/focus order, high-DPI scaling, minimum window size, and common 100%/150%/200% Windows display scales.
 - [ ] Verify app branding: final product name/version, executable metadata/icon, support URL, About dialog, and no development suffix in a release build.
@@ -109,17 +156,17 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 
 ## Verification run so far
 
-- `python -m compileall -q src app`: passed.
-- `PYTHONPATH=src .venv/bin/python -m pytest -q src/tests/test_ihex.py src/tests/test_programmer_adapter.py src/tests/test_svg.py src/tests/test_safety.py`: **14 passed**.
+- `python -m compileall -q src app`: passed after the current UX changes.
+- `PYTHONPATH=src .venv/bin/python -m pytest -q src/tests/test_ihex.py src/tests/test_programmer_adapter.py src/tests/test_svg.py src/tests/test_safety.py`: **18 passed** locally.
+- Current GUI integration tests cannot run in this Linux sandbox: PySide6 imports fail because system `libGL.so.1` is absent. Windows run `45806778512` caught two stale assertions; run `45807183480` caught a tooltip capitalization mismatch. All are fixed, and final run `45807577569` passes the full screenshot-enabled test suite and Windows packaging workflow.
 - `bash packaging/build_host_posix.sh`: built the upstream C++ helper into ignored `tools/ardpicprog`; CLI help smoke test passed.
 - `git diff --check`: passed on the current changes.
 - PyInstaller spec path was corrected after an initial failed attempt. A Linux packaging attempt is still blocked because the sandbox Python lacks `libpython3.11.so.1.0`; this is not a Windows build result.
-- Full `pytest src/tests` collection is blocked in this Linux image because importing PySide6 fails on missing `libGL.so.1`; focused non-GUI tests pass. The Windows Actions workflow passed its test step, but this is not a clean-machine launch test.
-- Windows CI passed for commit `addb764` in Actions run `45729144989`; it produced a temporary candidate ZIP plus CI-checked SHA-256 sidecar and the UI screenshot artifact. None is a published Release asset. The local GUI test remains blocked by missing Linux `libGL.so.1`; no clean-machine Windows launch or physical hardware test has been performed.
+- Latest Windows CI passed for commit `302f86d` in Actions run `45807577569`; it produced a candidate ZIP, SHA-256 sidecar, test report, and fresh UI screenshots. These are temporary Actions artifacts, not a published Release. No clean-machine Windows launch or physical hardware test has been performed.
 
 ## Remaining release blockers
 
-- [x] Successfully run the Windows build/test workflow and produce a candidate artifact (run `45725008411`).
+- [x] Run the Windows build/test workflow after inline-guidance, mismatch-gating, theme, and regression-test changes (run `45807577569`).
 - [ ] Physically validate the adapter and safety behavior with supported hardware.
 - [ ] Publish and test a real GitHub Release asset.
 

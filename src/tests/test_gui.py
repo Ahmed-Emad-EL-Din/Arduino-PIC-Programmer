@@ -53,6 +53,9 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertIsNotNone(self.win.log_pane)
         self.assertIsNotNone(self.win.cmb_board)
         self.assertIsNotNone(self.win.cmb_mcu)
+        self.assertIn("not measured", self.win.status_lbl.text())
+        self.assertIn("Raw silicon ID", self.win.btn_detect.toolTip())
+        self.assertIn("Target selected:", self.win.chip_target.text())
         capture_window(self.win, "main-dark-no-hardware.png")
 
     def test_circuit_panel_tabs(self):
@@ -77,7 +80,44 @@ class TestGUIIntegration(unittest.TestCase):
         self.win._refresh_actions()
         self.win.circuit_panel.set_hex_image(img)
         self.win.circuit_panel.tabs.setCurrentIndex(2)
+        self.assertIn(
+            "does not verify target identity",
+            self.win.circuit_panel.hex_summary_lbl.text(),
+        )
+        self.assertIn("Addresses fit", self.win.lbl_hex_guidance.text())
+        self.assertIn("does not verify target identity", self.win.lbl_hex_guidance.text())
         capture_window(self.win, "hex-inspector-dark.png")
+
+    def test_out_of_range_hex_disables_program_when_connected(self):
+        self.win.session.state.verified = True
+        self.win.session.state.port = "COM1"
+        img = HexImage()
+        img.data[0x6000] = 0x34
+        img.data[0x6001] = 0x12
+        self.win.hex_img = img
+        self.win.hex_path = "out-of-range.hex"
+        self.win._refresh_hex_summary()
+        self.win._refresh_actions()
+        self.assertFalse(self.win.btn_program.isEnabled())
+        self.assertFalse(self.win.btn_verify.isEnabled())
+        self.assertIn("outside", self.win.btn_program.toolTip())
+
+    def test_reported_target_mismatch_blocks_hardware_actions(self):
+        self.win.session.state.verified = True
+        self.win.session.state.port = "COM1"
+        self.win.cmb_mcu.setCurrentIndex(self.win.cmb_mcu.findData("pic16f84a"))
+        self.win._reported_target_name = "pic12f675"
+        self.win.hex_img = HexImage()
+        self.win.hex_img.data[0] = 0
+        self.win.hex_img.data[1] = 0
+        self.win._refresh_hex_summary()
+        self.win._refresh_actions()
+        self.assertFalse(self.win.btn_blank.isEnabled())
+        self.assertFalse(self.win.btn_read.isEnabled())
+        self.assertFalse(self.win.btn_erase.isEnabled())
+        self.assertFalse(self.win.btn_program.isEnabled())
+        self.assertTrue(self.win.btn_detect.isEnabled())
+        self.assertIn("Blocked:", self.win.lbl_target_guidance.text())
 
     def test_dialogs_instantiation(self):
         dlg_flash = FlashArduinoDialog(self.win.settings, self.win.lane, self.win)

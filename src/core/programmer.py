@@ -266,7 +266,11 @@ class ProgrammerSession:
             self._compare(image, readback, dev)
         if pct:
             pct(1, 1)
-        return "Programming complete; read-back verification passed and host closed its serial port."
+        verification = (
+            "read-back comparison passed"
+            if do_verify else "read-back comparison was disabled and not performed"
+        )
+        return f"Programming finished; {verification}. Host closed its serial port."
 
     def verify_hex(self, image: HexImage, dev: McuDevice, progress: Progress = None,
                    pct: Percent = None, force_calibration: bool = False) -> str:

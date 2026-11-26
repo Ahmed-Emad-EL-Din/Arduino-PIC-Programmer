@@ -35,9 +35,14 @@ class PreflightDialog(QDialog):
         self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
         self.continue_button = self.buttons.addButton("I verified — Continue", QDialogButtonBox.ButtonRole.AcceptRole)
         self.continue_button.setEnabled(False)
+        self.cancel_button = self.buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        self.cancel_button.setDefault(True)
+        self.cancel_button.setAutoDefault(True)
+        self.cancel_button.setFocus()
+        self.continue_button.setAutoDefault(False)
         self.buttons.rejected.connect(self.reject)
         self.buttons.accepted.connect(self.accept)
-        self.buttons.button(QDialogButtonBox.StandardButton.Cancel).clicked.connect(self.reject)
+        self.cancel_button.clicked.connect(self.reject)
         layout.addWidget(self.buttons)
 
     def _sync(self, *_args) -> None:
@@ -52,10 +57,18 @@ def show_preflight(parent, seen: bool, dev=DEFAULT_DEVICE, board_key: str = "uno
     return dialog.exec() == QDialog.DialogCode.Accepted
 
 
-def confirm_erase(parent, dev) -> bool:
+def confirm_erase(parent, dev, preserve_calibration: bool = True) -> bool:
+    if not preserve_calibration:
+        QMessageBox.warning(
+            parent,
+            "Erase blocked",
+            "This build cannot erase with calibration preservation disabled unless an explicit factory-calibration backup is supplied. Keep preservation enabled; no erase command was sent.",
+        )
+        return False
     answer = QMessageBox.warning(
-        parent, f"Erase {dev.display_name}?",
-        "This permanently erases user memory on the selected PIC. Factory calibration is preserved by the host firmware. Continue only after confirming the target and wiring.",
+        parent,
+        f"Erase {dev.display_name}?",
+        "This permanently erases user memory on the selected PIC. Calibration preservation is requested, but host behavior has not been hardware-validated for every device. The host uses the selected device map; raw silicon ID is not exposed to this app. Socket voltage is not measured. Confirm the package marking, wiring, and external VPP supply; verify VPP is off before touching the target.",
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
         QMessageBox.StandardButton.Cancel,
     )
@@ -63,10 +76,10 @@ def confirm_erase(parent, dev) -> bool:
 
 
 def confirm_program(parent, dev, filename: str, summary: str, do_verify: bool) -> bool:
-    verification = "Read-back verification is enabled." if do_verify else "WARNING: read-back verification is disabled."
+    verification = "Read-back comparison is enabled." if do_verify else "WARNING: read-back comparison is disabled."
     answer = QMessageBox.warning(
         parent, f"Program {dev.display_name}?",
-        f"File: {filename}\n\n{summary}\n\n{verification}\n\nThe host will erase, write, and then power off the socket. Continue?",
+        f"File: {filename}\n\n{summary}\n\n{verification}\n\nContinue only after confirming the chip marking and wiring. The app cannot measure socket voltage; verify the external VPP supply is off before touching the target.",
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
         QMessageBox.StandardButton.Cancel,
     )
