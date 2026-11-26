@@ -15,10 +15,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
           cache: pip
@@ -59,7 +59,7 @@ jobs:
 
       - name: Upload real Qt UI screenshots for review
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Arduino-PIC-Programmer-UI-screenshots
           path: artifacts/ui/*.png
@@ -79,14 +79,20 @@ jobs:
           if (!(Test-Path 'dist/Arduino-PIC-Programmer/_internal/tools/avrdude/avrdude.conf')) { throw 'Bundled avrdude.conf missing.' }
           if (!(Test-Path 'dist/Arduino-PIC-Programmer/_internal/firmware/precompiled/uno.hex')) { throw 'Uno ProgramPic firmware missing.' }
 
-      - name: Create portable ZIP
+      - name: Create portable ZIP and SHA-256 checksum
         shell: pwsh
-        run: Compress-Archive -Path 'dist/Arduino-PIC-Programmer/*' -DestinationPath 'dist/Arduino-PIC-Programmer-Windows-x64.zip' -Force
+        run: |
+          $Zip = 'dist/Arduino-PIC-Programmer-Windows-x64.zip'
+          Compress-Archive -Path 'dist/Arduino-PIC-Programmer/*' -DestinationPath $Zip -Force
+          $Hash = (Get-FileHash -Path $Zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$Hash  Arduino-PIC-Programmer-Windows-x64.zip" | Set-Content -Path "$Zip.sha256" -Encoding ascii
 
       - name: Upload candidate build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Arduino-PIC-Programmer-Windows-x64-candidate
-          path: dist/Arduino-PIC-Programmer-Windows-x64.zip
+          path: |
+            dist/Arduino-PIC-Programmer-Windows-x64.zip
+            dist/Arduino-PIC-Programmer-Windows-x64.zip.sha256
           if-no-files-found: error
           retention-days: 14

@@ -51,7 +51,8 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [x] Create/restore the app entry point, persistent settings, dialogs, theme, icons, and worker lane required by the workbench.
 - [x] Add test coverage for HEX parsing, backend adapter results, and SVG validity.
 - [x] Add real Qt window screenshot capture for dark/light home screens and the HEX inspector; add an Actions artifact upload step for review.
-- [ ] Run the screenshot-enabled GUI integration suite on a supported Windows runner and visually review the generated images; Linux GUI tests cannot currently import Qt because this environment lacks system graphics libraries.
+- [x] Run the screenshot-enabled GUI integration suite on Windows; tests passed and screenshot artifact was uploaded from Actions run `45728158382`.
+- [ ] Visually inspect the generated image files for clipping, unreadable text, spacing, and misleading states; the artifact is available from that Actions run.
 - [ ] Test startup without hardware, settings file, or recent files; test corrupt settings and unavailable COM ports.
 - [ ] Test file open/drag-drop/save, recent files, preflight dismissal/acceptance, settings persistence, cancellation, and clean shutdown.
 - [ ] Test the UI at common Windows DPI scales and resolutions; ensure dialogs/buttons/text remain visible.
@@ -84,11 +85,12 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 
 ## Phase 5.5 — Professional polish, support, and trust
 
-- [ ] Review actual CI-generated UI screenshots for the main screen in dark/light themes and a HEX-inspector state; fix clipping, unreadable text, awkward spacing, and stale/unverified hardware claims. Screenshot capture runs in the Windows GUI tests; the first artifact is pending a fresh workflow run.
+- [ ] Review actual CI-generated UI screenshots for the main screen in dark/light themes and a HEX-inspector state; fix clipping, unreadable text, awkward spacing, and stale/unverified hardware claims. Artifact is in Actions run `45728158382` as `Arduino-PIC-Programmer-UI-screenshots`.
 - [ ] Verify empty/no-hardware, disconnected, loading, failure, success, and destructive-confirmation UI states; ensure errors are actionable and success is never reported prematurely.
 - [ ] Review keyboard navigation, accessible names/focus order, high-DPI scaling, minimum window size, and common 100%/150%/200% Windows display scales.
 - [ ] Verify app branding: final product name/version, executable metadata/icon, support URL, About dialog, and no development suffix in a release build.
-- [ ] Add a generated SHA-256 file for every candidate/release ZIP; verify it after download and publish checksum next to final assets.
+- [x] Add Windows workflow generation of a `.sha256` sidecar for every candidate ZIP.
+- [ ] Verify the generated sidecar matches the candidate ZIP after a successful build/download; publish checksum next to final release assets.
 - [ ] Produce a dependency/license inventory (SBOM or equivalent), confirm all bundled notices/licenses are included, and document known limits and supported board/PIC combinations.
 - [ ] Pin third-party GitHub Actions to immutable commit SHAs and add a routine dependency/security update process before public releases.
 - [ ] Decide and document Windows code-signing policy. If unsigned, clearly state SmartScreen may warn; never imply an unsigned build is signed/trusted.
@@ -112,7 +114,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - `git diff --check`: passed on the current changes.
 - PyInstaller spec path was corrected after an initial failed attempt. A Linux packaging attempt is still blocked because the sandbox Python lacks `libpython3.11.so.1.0`; this is not a Windows build result.
 - Full `pytest src/tests` collection is blocked in this Linux image because importing PySide6 fails on missing `libGL.so.1`; focused non-GUI tests pass. The Windows Actions workflow passed its test step, but this is not a clean-machine launch test.
-- Windows CI passed and produced a temporary candidate ZIP in Actions run `45725008411`; it is not a published Release asset. No clean-machine launch or physical hardware test has been performed.
+- Windows CI passed for the screenshot-enabled commit in Actions run `45728158382`; it produced both a temporary candidate ZIP and the UI screenshot artifact. Neither is a published Release asset. The local GUI test remains blocked by missing Linux `libGL.so.1`; no clean-machine Windows launch or physical hardware test has been performed.
 
 ## Remaining release blockers
 
