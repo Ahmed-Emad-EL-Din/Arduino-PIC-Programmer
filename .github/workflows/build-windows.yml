@@ -341,8 +341,14 @@ jobs:
         run: |
           $Package = 'dist/Arduino-PIC-Programmer'
           $Zip = 'dist/Arduino-PIC-Programmer-Windows-x64.zip'
-          python packaging/create_portable_zip.py --source $Package --output $Zip
-          if ($LASTEXITCODE -ne 0) { throw 'Compact portable ZIP creation/validation failed.' }
+          $ZipOutput = & python -u packaging/create_portable_zip.py --source $Package --output $Zip 2>&1
+          $ZipExitCode = $LASTEXITCODE
+          $ZipOutput | ForEach-Object { Write-Output $_ }
+          if ($ZipExitCode -ne 0) {
+            $Details = ($ZipOutput | Out-String).Trim()
+            if ([string]::IsNullOrWhiteSpace($Details)) { $Details = 'Python returned a non-zero exit code without diagnostic output.' }
+            throw "Compact portable ZIP creation/validation failed (exit code $ZipExitCode): $Details"
+          }
           $ZipHash = (Get-FileHash -Path $Zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$ZipHash  Arduino-PIC-Programmer-Windows-x64.zip" | Set-Content -Path "$Zip.sha256" -Encoding ascii
           $ZipWrittenHash = ((Get-Content -Path "$Zip.sha256" -Raw).Trim() -split ' +')[0]
