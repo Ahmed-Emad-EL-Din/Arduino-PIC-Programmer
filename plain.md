@@ -63,8 +63,8 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [x] Add `packaging/build_firmware.ps1` to compile board-specific ProgramPic images and stage avrdude/configuration for packaging.
 - [x] Add a Windows GitHub Actions candidate-build workflow that compiles, tests, packages, checks required files, and uploads a short-lived candidate artifact.
 - [x] Build the upstream ArdPicProg POSIX host locally and confirm its CLI help starts; this is only a source smoke test, not a Windows build.
-- [ ] Run the Windows workflow and fix all compiler, Arduino CLI, PyInstaller, missing-runtime, and test failures.
-- [ ] Verify the output is a portable onedir bundle with `Arduino-PIC-Programmer.exe` at the expected path and no Python install required.
+- [x] Run the Windows workflow for commit `e5fdca373c06c05ac94d43941562c08c41775a3e`; it completed successfully with passing tests, firmware compilation, packaging, and required-file checks (Actions run `45725008411`).
+- [x] Produce the portable onedir candidate artifact with `Arduino-PIC-Programmer.exe` at the package root; CI confirmed the executable and core bundled host/avrdude/firmware files exist. Clean-machine launch remains unverified (Phase 5).
 - [ ] Verify `ardpicprog.exe`, avrdude, its config and adjacent DLLs, all firmware images, Qt plugins, docs, and notices exist in the built package.
 - [ ] Verify bootloader handling for Uno/Nano/Mega/5V Pro Mini. Leonardo/Micro flashing through this dialog is explicitly unsupported until their bootloader port-reset flow is implemented; do not claim those upload paths work.
 - [ ] Acceptance: candidate package launches on a clean Windows 10/11 x64 machine, every required input is present, and missing ports/files produce actionable errors.
@@ -97,12 +97,12 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - `bash packaging/build_host_posix.sh`: built the upstream C++ helper into ignored `tools/ardpicprog`; CLI help smoke test passed.
 - `git diff --check`: passed on the current changes.
 - PyInstaller spec path was corrected after an initial failed attempt. A Linux packaging attempt is still blocked because the sandbox Python lacks `libpython3.11.so.1.0`; this is not a Windows build result.
-- Full `pytest src/tests` collection was attempted and is blocked in this Linux image because importing PySide6 fails on missing `libGL.so.1`; focused non-GUI tests pass. Other Qt runtime libraries may also be absent. The Windows workflow is intended to provide the supported GUI runtime test.
-- No Windows candidate build has completed, no physical hardware test has been performed, and no downloadable EXE/release asset exists yet.
+- Full `pytest src/tests` collection is blocked in this Linux image because importing PySide6 fails on missing `libGL.so.1`; focused non-GUI tests pass. The Windows Actions workflow passed its test step, but this is not a clean-machine launch test.
+- Windows CI passed and produced a temporary candidate ZIP in Actions run `45725008411`; it is not a published Release asset. No clean-machine launch or physical hardware test has been performed.
 
 ## Remaining release blockers
 
-- [ ] Successfully run and fix the Windows build/test workflow.
+- [x] Successfully run the Windows build/test workflow and produce a candidate artifact (run `45725008411`).
 - [ ] Physically validate the adapter and safety behavior with supported hardware.
 - [ ] Publish and test a real GitHub Release asset.
 

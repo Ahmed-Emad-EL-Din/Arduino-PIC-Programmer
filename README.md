@@ -1,8 +1,12 @@
 # Arduino-PIC Programmer
 
-**Windows download:** [Check the project releases](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases).
+## Windows build status
 
-There is currently no published release or downloadable `.exe` asset in this repository. The previously documented `v2.0.0` URL was broken, so it has been removed instead of being presented as a working download. A Windows build must be published before a direct executable link can be provided.
+**Candidate build:** the Windows CI build passed for commit `e5fdca3`. [Open the successful GitHub Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45725008411), then scroll to **Artifacts** and download **Arduino-PIC-Programmer-Windows-x64-candidate**. Extract the ZIP and launch `Arduino-PIC-Programmer.exe` from the extracted folder. Keep the adjacent `_internal` folder in place; the EXE will not work if moved by itself.
+
+This is a temporary Actions artifact (14-day retention; GitHub sign-in/repository access may be required), **not a published GitHub Release**. If it expires, open the repository's **Actions → Windows desktop package** workflow, choose **Run workflow**, select the branch you want to build, and download the artifact from that successful run.
+
+**Not yet a validated release:** the build workflow passed, but the application has not been launched on a clean Windows PC or tested with physical programmer hardware. Do not use this candidate for destructive programming until the Windows and hardware acceptance steps below pass. The [Releases page](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases) does not yet contain a validated downloadable release.
 
 **Made By:** Ahmed Emad El-Din Hussein · [https://github.com/Ahmed-Emad-EL-Din](https://github.com/Ahmed-Emad-EL-Din)
 
@@ -99,7 +103,7 @@ PIC16F872, PIC16F877/A, PIC16F882–887, PIC12F629, PIC12F675, PIC12F683.
 ---
 
 ## 5. Requirements
-* **Windows 10/11:** no Windows executable is currently published.
+* **Windows 10/11:** a temporary CI candidate artifact is available above; no validated Windows executable has been published as a GitHub Release.
 * **Arduino Board** + **LM317 13V Circuit** + **ZIF/ICSP Shield** for hardware use.
 * **24V DC Supply** (as used in the circuit image above; verify your exact circuit design).
 * Firmware source is in `firmware/source/`; Windows build scripts compile board-specific firmware and stage `avrdude` for the portable package.
