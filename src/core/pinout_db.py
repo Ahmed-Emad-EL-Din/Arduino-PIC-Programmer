@@ -21,9 +21,10 @@ class BoardWiring:
     board_name: str
     mcu_label: str
     vdd_pin: str = "D2"
-    mclr_pin: str = "D3"
+    mclr_pin: str = "A1"
     clk_pin: str = "D4"
-    data_pin: str = "D5"
+    data_pin: str = "D7"
+    activity_pin: str = "A5"
     reset_pin: str = "RESET"
     needs_reset_cap: bool = True
     reset_cap_note: str = "Install the reset capacitor only after firmware upload."
@@ -113,12 +114,17 @@ def build_wiring_rows(board_key: str, mcu_name: str) -> List[Tuple[str, str, str
          f"PIC Pin {pic.pgc_pin}" if pic.pgc_pin else "PIC PGC (datasheet)", "Programming clock"),
         ("DATA / PGD", f"Arduino {board.data_pin}",
          f"PIC Pin {pic.pgd_pin}" if pic.pgd_pin else "PIC PGD (datasheet)", "Bidirectional data"),
-        ("MCLR / VPP", "Programmer VPP driver",
-         f"PIC Pin {pic.vpp_pin}" if pic.vpp_pin else "PIC MCLR/VPP (datasheet)", "13 V only from external VPP circuit"),
-        ("VDD", "Programmer switched supply",
-         ", ".join(map(str, pic.vdd_pins)) if pic.vdd_pins else "All VDD pins (datasheet)", "Verify package pinout and voltage"),
-        ("VSS / GND", "Programmer ground",
-         ", ".join(map(str, pic.vss_pins)) if pic.vss_pins else "All VSS pins (datasheet)", "Common ground"),
+        ("MCLR / VPP", f"Arduino {board.mclr_pin} → VPP switch",
+         f"PIC Pin {pic.vpp_pin}" if pic.vpp_pin else "PIC MCLR/VPP (datasheet)",
+         "HIGH=reset/VPP off; LOW selects external ~13 V VPP. Never connect VPP to Arduino."),
+        ("VDD", f"Arduino {board.vdd_pin} switched +5 V",
+         ", ".join(map(str, pic.vdd_pins)) if pic.vdd_pins else "All VDD pins (datasheet)",
+         "Place 100 nF between target VDD and VSS."),
+        ("VSS / GND", "Arduino GND / common ground",
+         ", ".join(map(str, pic.vss_pins)) if pic.vss_pins else "All VSS pins (datasheet)",
+         "Common Arduino, PIC, VPP and VDD-circuit ground."),
+        ("Activity LED", f"Arduino {board.activity_pin} → resistor → LED anode",
+         "LED cathode → GND", "Indicates serial-command and read/write activity."),
     ]
     if pic.pgm_pin:
         rows.append(("PGM", "4.7 kΩ pull-down to GND", f"PIC Pin {pic.pgm_pin}", "Low-voltage programming disabled"))

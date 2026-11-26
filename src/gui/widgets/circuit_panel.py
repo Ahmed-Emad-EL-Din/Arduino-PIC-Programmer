@@ -404,11 +404,13 @@ class CircuitPanel(QWidget):
         lay.setSpacing(8)
 
         note = QLabel(
-            "<b>Official Ho-Ro / ArdPicProg v1.8.horo hardware reference</b> — "
-            "uses Arduino pins <b>D2 (VDD)</b>, <b>D3 (MCLR)</b>, <b>D4 (CLK)</b>, "
-            "<b>D5 (DATA)</b>. <i>Note:</i> Legacy rweather schematics online use "
-            "different pins (A1/D2/D4/D7) and inverted VPP polarity — always follow "
-            "the v1.8.horo pinout shown here."
+            "<b>Current firmware wiring (Nano):</b> D2=switched VDD, A1=external "
+            "MCLR/VPP switch control (HIGH=reset/VPP off, LOW=select VPP), D4=CLK, "
+            "D7=bidirectional DATA, A5=activity LED. <b>Never connect ~13 V directly "
+            "to A1 or any Arduino pin.</b> The upstream Ho-Ro reference images below "
+            "show a different pinout/polarity; they are historical references, not "
+            "wiring instructions for the firmware bundled by this app. Follow the "
+            "current pinout table and the exact target/VPP circuit documentation."
         )
         note.setWordWrap(True)
         lay.addWidget(note)

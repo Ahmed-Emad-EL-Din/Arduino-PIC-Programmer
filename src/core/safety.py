@@ -28,8 +28,9 @@ class PreflightItem:
 # Static fallback checklist (for callers without specific MCU context)
 ZIF_PREFLIGHT: List[PreflightItem] = [
     PreflightItem("vpp_led",
-                  "13 V VPP programming supply is connected to JP1 (NEVER to "
-                  "the Arduino barrel jack!) and the VPP indicator LED is ON."),
+                  "External VPP supply is connected only through the intended "
+                  "MCLR/VPP switching circuit; verify polarity and VPP-off state. "
+                  "Never connect the VPP rail to an Arduino pin or power input."),
     PreflightItem("power",
                   "Arduino is powered via USB and will NOT be unplugged during "
                   "the operation."),
@@ -70,10 +71,19 @@ def build_dynamic_preflight(dev: McuDevice, board_key: str = "uno") -> List[Pref
             "and Arduino Serial Monitor / MPLAB / QPICkit are closed.",
         ),
         PreflightItem(
+            "firmware_wiring",
+            f"Bundled firmware wiring: {bw.vdd_pin}=VDD, {bw.mclr_pin}=MCLR/VPP switch "
+            f"control (HIGH=reset/VPP off; LOW=select VPP), {bw.clk_pin}=clock, "
+            f"{bw.data_pin}=data, {bw.activity_pin}=activity LED. "
+            f"{bw.mclr_pin} is logic-only: never "
+            "connect the external VPP rail directly to an Arduino pin. Common ground; "
+            "100 nF across target VDD/VSS.",
+        ),
+        PreflightItem(
             "vpp_rail",
-            "External 13 V DC VPP supply is connected ONLY to programmer "
-            "header JP1 (polarity verified, red VPP LED lit — NEVER plugged "
-            "into the Arduino's power pin).",
+            "External programming voltage is wired only through the intended "
+            "MCLR/VPP switching circuit; verify supply polarity and that the "
+            "VPP rail is off before handling the PIC.",
         ),
     ]
 

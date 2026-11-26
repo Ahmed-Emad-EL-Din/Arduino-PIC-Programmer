@@ -26,23 +26,26 @@ def generate_schematic_svg(mcu_name: str, board_key: str = "uno", theme: str = "
 <text x="32" y="72" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="14">{escape(board.board_name)} → {title} · {escape(verify)}</text>
 <rect x="52" y="150" width="230" height="236" rx="14" fill="{c['panel']}" stroke="{c['border']}" stroke-width="2"/>
 <text x="167" y="185" text-anchor="middle" fill="{c['ink']}" font-family="Segoe UI,Arial" font-size="18" font-weight="700">Arduino</text>
-<text x="78" y="232" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="15">D2  switched VDD</text>
-<text x="78" y="270" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="15">D3  MCLR/VPP control</text>
-<text x="78" y="308" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="15">D4  PGC / clock</text>
-<text x="78" y="346" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="15">D5  PGD / data</text>
+<text x="78" y="222" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="14">D2  switched +5 V VDD</text>
+<text x="78" y="254" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="14">A1  MCLR/VPP switch control</text>
+<text x="78" y="286" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="14">D4  PGC / clock</text>
+<text x="78" y="318" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="14">D7  PGD / bidirectional data</text>
+<text x="78" y="350" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="14">A5  activity LED</text>
+<text x="78" y="377" fill="{c['warn']}" font-family="Segoe UI,Arial" font-size="11">A1 HIGH=reset; LOW=select external VPP</text>
 <rect x="650" y="150" width="250" height="236" rx="14" fill="{c['panel']}" stroke="{c['border']}" stroke-width="2"/>
 <text x="775" y="188" text-anchor="middle" fill="{c['ink']}" font-family="Segoe UI,Arial" font-size="18" font-weight="700">{title}</text>
 <text x="775" y="224" text-anchor="middle" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="14">{escape(pic.package)}</text>
 <text x="775" y="270" text-anchor="middle" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="14">MCLR/VPP · VDD · VSS</text>
 <text x="775" y="302" text-anchor="middle" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="14">PGC · PGD</text>
-<path d="M282 232 H610 Q630 232 650 260" fill="none" stroke="{c['wire']}" stroke-width="4"/>
-<path d="M282 270 H610 Q630 270 650 280" fill="none" stroke="{c['warn']}" stroke-width="4"/>
-<path d="M282 308 H610 Q630 308 650 300" fill="none" stroke="{c['wire']}" stroke-width="4"/>
-<path d="M282 346 H610 Q630 346 650 320" fill="none" stroke="{c['wire']}" stroke-width="4"/>
+<path d="M282 222 H610 Q630 222 650 260" fill="none" stroke="{c['wire']}" stroke-width="4"/>
+<path d="M282 254 H610 Q630 254 650 280" fill="none" stroke="{c['warn']}" stroke-width="4"/>
+<path d="M282 286 H610 Q630 286 650 300" fill="none" stroke="{c['wire']}" stroke-width="4"/>
+<path d="M282 318 H610 Q630 318 650 320" fill="none" stroke="{c['wire']}" stroke-width="4"/>
 <rect x="348" y="410" width="264" height="74" rx="12" fill="{c['panel']}" stroke="{c['border']}"/>
-<text x="480" y="438" text-anchor="middle" fill="{c['ink']}" font-family="Segoe UI,Arial" font-size="15" font-weight="700">External VPP / power circuit</text>
-<text x="480" y="462" text-anchor="middle" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="12">Follow the exact reference schematic; never feed VPP to Arduino power</text>
-<path d="M480 410 V270 H610" fill="none" stroke="{c['warn']}" stroke-width="3" stroke-dasharray="8 6"/>
+<text x="480" y="438" text-anchor="middle" fill="{c['ink']}" font-family="Segoe UI,Arial" font-size="13" font-weight="700">External VPP switch / power circuit</text>
+<text x="480" y="462" text-anchor="middle" fill="{c['muted']}" font-family="Segoe UI,Arial" font-size="11">A1 is logic-only; switched VPP output goes to PIC MCLR</text>
+<path d="M282 254 H320 V394 H390 V410" fill="none" stroke="{c['warn']}" stroke-width="3" stroke-dasharray="8 6"/>
+<path d="M612 430 H630 V280 H650" fill="none" stroke="{c['warn']}" stroke-width="3"/>
 <text x="480" y="516" text-anchor="middle" fill="{c['warn']}" font-family="Segoe UI,Arial" font-size="13" font-weight="700">Illustrative only — confirm every connection against the device and board datasheets.</text>
 </svg>'''
     return sketch.encode("utf-8")

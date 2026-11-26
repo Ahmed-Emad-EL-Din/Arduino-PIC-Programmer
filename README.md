@@ -34,7 +34,7 @@ Do not disable SmartScreen or bypass its warning for an unvalidated candidate. V
 ### Required hardware
 - **Arduino:** Uno, Nano, Mega, Leonardo/Micro, or 5 V / 16 MHz Pro Mini. The 3.3 V Pro Mini is not electrically compatible.
 - **Target PIC:** one of the supported devices; confirm its exact package and pinout in the device datasheet.
-- **Programmer interface:** ArdPicProg shield or equivalent ZIF/ICSP wiring. D2=VDD, D3=MCLR/VPP, D4=CLK, D5=DATA. Some boards need the reset capacitor noted in the board-specific wiring reference.
+- **Programmer interface:** the bundled firmware uses this Arduino Nano pin map: D2=switched target VDD, A1=external MCLR/VPP switch control, D4=PGC/clock, D7=bidirectional PGD/data, and A5=activity LED. A1 is a low-voltage logic control only: HIGH selects reset/VPP-off; LOW selects the external ~13 V VPP switch. Never connect VPP directly to A1 or another Arduino pin. Join Arduino GND, PIC VSS, and the VPP/VDD circuit ground; place 100 nF between PIC VDD and VSS. Some boards need the reset capacitor noted in the board-specific wiring reference.
 - **VPP supply:** use the supply specified by the exact programmer hardware. The LM317 drawing below is a calculation/reference circuit, not a validated substitute for the official ArdPicProg shield. The user guide's official shield reference calls for a 16–20 V input; do not apply 24 V to that shield unless its documentation explicitly permits it.
 
 ### LM317 reference circuit: 24 V DC to approximately 13 V VPP
