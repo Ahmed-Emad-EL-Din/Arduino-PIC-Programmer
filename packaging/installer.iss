@@ -24,7 +24,6 @@ SetupIconFile=..\assets\app-icon.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
 UninstallDisplayVersion={#AppVersion}
-UninstallDisplayPublisher={#AppPublisher}
 OutputDir=..\dist\installer
 OutputBaseFilename=Arduino-PIC-Programmer-Setup-x64
 Compression=lzma2/ultra64

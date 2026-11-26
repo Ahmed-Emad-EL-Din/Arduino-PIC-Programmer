@@ -242,8 +242,14 @@ jobs:
       - name: Build per-user installer
         shell: pwsh
         run: |
-          & $env:INNO_SETUP_COMPILER 'packaging/installer.iss'
-          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed.' }
+          $CompilerOutput = & $env:INNO_SETUP_COMPILER 'packaging/installer.iss' 2>&1
+          $CompilerExitCode = $LASTEXITCODE
+          $CompilerOutput | ForEach-Object { Write-Output $_ }
+          if ($CompilerExitCode -ne 0) {
+            $Details = ($CompilerOutput | Out-String).Trim()
+            if ([string]::IsNullOrWhiteSpace($Details)) { $Details = 'ISCC.exe returned a non-zero exit code without diagnostic output.' }
+            throw "Inno Setup compilation failed (exit code $CompilerExitCode): $Details"
+          }
           if (!(Test-Path 'dist/installer/Arduino-PIC-Programmer-Setup-x64.exe')) {
             throw 'Installer output was not created.'
           }
