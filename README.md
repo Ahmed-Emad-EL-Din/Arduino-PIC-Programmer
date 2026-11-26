@@ -2,20 +2,26 @@
 
 ## Windows build status
 
-**Candidate build:** the Windows CI build passed for commit `23044ba`. [Open the successful GitHub Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45825021860), then scroll to **Artifacts** and download **Arduino-PIC-Programmer-Windows-x64-candidate**. GitHub downloads the Actions artifact as an outer ZIP; extract that first to find the candidate ZIP and its `.sha256` sidecar. In PowerShell, verify the candidate ZIP before extracting it:
+**Installable Windows package:** after this branch's updated Windows workflow passes, open the [Windows desktop package workflow](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/workflows/build-windows.yml), select that successful run, and download **Arduino-PIC-Programmer-Windows-x64-candidate**. The previously passing workflow run predates installer packaging and does not contain a setup executable. Extract GitHub's outer artifact ZIP. The updated artifact will contain an installer, the portable ZIP, and a SHA-256 sidecar for each. Verify the installer before running it:
 
 ```powershell
-$zip = 'Arduino-PIC-Programmer-Windows-x64.zip'
-$expected = ((Get-Content ($zip + '.sha256') -Raw).Trim() -split ' +')[0].ToLowerInvariant()
-$actual = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($actual -ne $expected) { throw 'SHA-256 mismatch; do not use this file.' }
+$setup = 'Arduino-PIC-Programmer-Setup-x64.exe'
+$expected = ((Get-Content ($setup + '.sha256') -Raw).Trim() -split ' +')[0].ToLowerInvariant()
+$actual = (Get-FileHash -Path $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { throw 'SHA-256 mismatch; do not install this file.' }
 ```
 
-Then extract `Arduino-PIC-Programmer-Windows-x64.zip` and launch `Arduino-PIC-Programmer.exe`. Keep the adjacent `_internal` folder in place; the EXE will not work if moved by itself. The same Actions run also contains **Arduino-PIC-Programmer-UI-screenshots** for dark, light, and HEX-inspector UI captures.
+The installer performs a per-user install, adds a Start menu shortcut, and registers an uninstaller; it does not require administrator rights. The portable ZIP remains available as an alternative and must be extracted with its `_internal` folder kept beside the EXE. The same run also uploads short-lived real UI screenshots for review.
 
-This is a temporary Actions artifact (14-day retention; GitHub sign-in/repository access may be required), **not a published GitHub Release**. If it expires, open the repository's **Actions → Windows desktop package** workflow, choose **Run workflow**, select the branch you want to build, and download the artifact from that successful run.
+These will be temporary Actions artifacts (14-day retention; GitHub sign-in/repository access may be required), **not a published GitHub Release**. If they expire, run the workflow manually for the desired branch.
 
-**Not yet a validated release:** the build workflow passed, but the application has not been launched on a clean Windows PC or tested with physical programmer hardware. Do not use this candidate for destructive programming until the Windows and hardware acceptance steps below pass. The [Releases page](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases) does not yet contain a validated downloadable release.
+### Why Windows may show “Windows protected your PC”
+
+That dialog is Microsoft Defender SmartScreen's **publisher/file-reputation** warning. It commonly appears for a new, unsigned download; it is not by itself a malware detection. Packaging the EXE inside an installer or ZIP does not remove the warning. This workflow signs the app binaries and installer only for version-tag builds when a trusted Authenticode certificate is configured through protected GitHub Actions secrets. Without that signing setup, the candidate is unsigned and SmartScreen may warn. Even a valid signature does not guarantee an immediate warning-free first release: reputation builds over time, and EV certificates no longer bypass SmartScreen. Microsoft identifies Microsoft Store distribution as the reliable way to avoid SmartScreen download warnings; that distribution path is not set up for this project yet. See [Microsoft's SmartScreen guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation).
+
+Do not disable SmartScreen or bypass its warning for this unvalidated candidate. Verify the source and SHA-256; wait for a signed, hardware-validated release before installing it for programming work.
+
+**Not yet a validated release:** the updated installer workflow has not run yet. Once it does, it will build and smoke-test the installer, but that still will not replace clean-PC testing or physical programmer hardware validation. Do not use this candidate for destructive programming until the Windows and hardware acceptance steps below pass. The [Releases page](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases) does not yet contain a validated downloadable release.
 
 **Made By:** Ahmed Emad El-Din Hussein · [https://github.com/Ahmed-Emad-EL-Din](https://github.com/Ahmed-Emad-EL-Din)
 
@@ -58,7 +64,7 @@ The HEX memory-map inspector is an application feature; no screenshot is include
 4. Press **Flash Firmware** in a build that contains the matching precompiled firmware and bundled `avrdude`.
 5. Confirm success only after the uploader reports that ProgramPic firmware was uploaded.
 
-> The firmware source and Windows build scripts are present, but no published Windows executable is available yet. Some board bootloader flows (currently Leonardo/Micro) must be flashed using Arduino IDE until their port-reset flow is implemented.
+> The candidate is a temporary Actions artifact, not a published release. Leonardo/Micro firmware upload in this app is unsupported; use Arduino IDE for those boards.
 
 ### Step 2 — Connect & Verify
 1. Connect the Arduino by USB. Only connect an external VPP supply that matches the exact programmer hardware; the reference LM317 circuit above is not hardware-validated.

@@ -202,11 +202,13 @@ class MainWindow(QMainWindow):
         self.progress.setValue(0)
         self.progress.setMaximumWidth(280)
         psl.addWidget(self.progress, 1)
+        self.progress.setVisible(False)
 
         self.btn_cancel = QPushButton("Cancel")
         self.btn_cancel.setObjectName("dangerOutline")
         self.btn_cancel.setFixedHeight(26)
         self.btn_cancel.setEnabled(False)
+        self.btn_cancel.setVisible(False)
         self.btn_cancel.clicked.connect(self._cancel_current)
         psl.addWidget(self.btn_cancel)
         outer.addWidget(prog_strip)
@@ -687,10 +689,6 @@ class MainWindow(QMainWindow):
         tb.addSeparator()
         tb.addAction(self.act_connect)
         tb.addAction(self.act_program)
-        tb.addSeparator()
-        tb.addAction(self.act_theme)
-        tb.addAction(self.act_settings)
-        tb.addAction(self.act_guide)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, tb)
 
     # ------------------------------------------------------------------
@@ -736,7 +734,7 @@ class MainWindow(QMainWindow):
 
     def _zoom_font(self, step: int) -> None:
         if step == 0:
-            fs = 10
+            fs = 11
         else:
             fs = max(9, min(14, self.settings.font_size + step))
         self.settings.font_size = fs
@@ -1038,6 +1036,8 @@ class MainWindow(QMainWindow):
         self.btn_reload_hex.setEnabled(not busy and bool(self.hex_path))
         self.btn_program.setEnabled(not busy and conn and has_hex and hex_fits and not target_mismatch)
         self.btn_verify.setEnabled(not busy and conn and has_hex and hex_fits and not target_mismatch)
+        self.progress.setVisible(busy)
+        self.btn_cancel.setVisible(busy)
         self.btn_cancel.setEnabled(busy)
 
         if target_mismatch:

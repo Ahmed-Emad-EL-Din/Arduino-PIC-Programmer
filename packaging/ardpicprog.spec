@@ -61,6 +61,8 @@ exe = EXE(
     upx=False,
     console=False,
     disable_windowed_traceback=False,
+    icon=str(ROOT / "assets" / "app-icon.ico"),
+    version=str(ROOT / "packaging" / "version_info.txt"),
 )
 collection = COLLECT(
     exe,
