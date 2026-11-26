@@ -107,7 +107,9 @@ jobs:
             "$Internal/tools/avrdude/avrdude.conf",
             "$Internal/docs/USER_GUIDE.md",
             "$Internal/assets/reference/ArdPicProg_1_8_horo.png",
+            "$Internal/assets/reference/ArdPicProg.jpg",
             "$Internal/assets/app-icon.ico",
+            "$Internal/licenses/AVRDUDE-LICENSE.txt",
             "$Internal/licenses/LICENSE",
             "$Internal/licenses/LGPL-3.0.txt",
             "$Internal/licenses/THIRD_PARTY_NOTICES.md",
@@ -116,6 +118,35 @@ jobs:
           )
           foreach ($Path in $Required) {
             if (!(Test-Path $Path)) { throw "Required package file missing: $Path" }
+          }
+          $AllowedData = @{
+            "$Internal/firmware" = @('precompiled/uno.hex', 'precompiled/nano_new.hex', 'precompiled/nano_old.hex', 'precompiled/pro_mini_5v.hex', 'precompiled/mega2560.hex', 'precompiled/leonardo.hex', 'precompiled/micro.hex')
+            "$Internal/docs" = @('USER_GUIDE.md')
+            "$Internal/assets" = @('app-icon.ico', 'reference/ArdPicProg.jpg', 'reference/ArdPicProg_1_8_horo.png')
+          }
+          foreach ($Root in $AllowedData.Keys) {
+            $AbsoluteRoot = (Resolve-Path $Root).Path
+            $Actual = @(Get-ChildItem $AbsoluteRoot -Recurse -File | ForEach-Object {
+              [IO.Path]::GetRelativePath($AbsoluteRoot, $_.FullName).Replace('\', '/')
+            })
+            $Expected = @($AllowedData[$Root])
+            $Unexpected = @($Actual | Where-Object { $_ -notin $Expected })
+            $Missing = @($Expected | Where-Object { $_ -notin $Actual })
+            if ($Unexpected.Count -or $Missing.Count) {
+              throw "Unexpected runtime data in $Root. Unexpected: $($Unexpected -join ', '); missing: $($Missing -join ', ')"
+            }
+          }
+          $ToolRoot = (Resolve-Path "$Internal/tools").Path
+          $ActualTools = @(Get-ChildItem $ToolRoot -Recurse -File | ForEach-Object {
+            [IO.Path]::GetRelativePath($ToolRoot, $_.FullName).Replace('\', '/')
+          })
+          $ExpectedTools = @('ardpicprog.exe', 'avrdude/avrdude.exe', 'avrdude/avrdude.conf') + @(
+            Get-ChildItem 'tools/avrdude' -File -Filter '*.dll' | ForEach-Object { "avrdude/$($_.Name)" }
+          )
+          $UnexpectedTools = @($ActualTools | Where-Object { $_ -notin $ExpectedTools })
+          $MissingTools = @($ExpectedTools | Where-Object { $_ -notin $ActualTools })
+          if ($UnexpectedTools.Count -or $MissingTools.Count) {
+            throw "Unexpected bundled tools. Unexpected: $($UnexpectedTools -join ', '); missing: $($MissingTools -join ', ')"
           }
           $ProductVersion = (Get-Item "$Package/Arduino-PIC-Programmer.exe").VersionInfo.ProductVersion
           if ($ProductVersion -notlike '2.1.0*') { throw "Unexpected application product version: $ProductVersion" }
@@ -287,8 +318,14 @@ jobs:
       - name: Create portable ZIP and setup SHA-256 checksums
         shell: pwsh
         run: |
+          $Package = 'dist/Arduino-PIC-Programmer'
+          $TopLevel = @(Get-ChildItem $Package -Force | ForEach-Object { $_.Name } | Sort-Object)
+          $ExpectedTopLevel = @('_internal', 'Arduino-PIC-Programmer.exe') | Sort-Object
+          if (Compare-Object $ExpectedTopLevel $TopLevel) {
+            throw "Portable package root contains unexpected files. Expected only the app executable and its runtime folder; found: $($TopLevel -join ', ')"
+          }
           $Zip = 'dist/Arduino-PIC-Programmer-Windows-x64.zip'
-          Compress-Archive -Path 'dist/Arduino-PIC-Programmer/*' -DestinationPath $Zip -Force
+          Compress-Archive -Path "$Package/*" -DestinationPath $Zip -Force
           $ZipHash = (Get-FileHash -Path $Zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$ZipHash  Arduino-PIC-Programmer-Windows-x64.zip" | Set-Content -Path "$Zip.sha256" -Encoding ascii
           $ZipWrittenHash = ((Get-Content -Path "$Zip.sha256" -Raw).Trim() -split ' +')[0]

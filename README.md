@@ -11,7 +11,7 @@ $actual = (Get-FileHash -Path $setup -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actual -ne $expected) { throw 'SHA-256 mismatch; do not install this file.' }
 ```
 
-The installer performs a per-user install, adds a Start menu shortcut, and registers an uninstaller; it does not require administrator rights. The portable ZIP remains available as an alternative and must be extracted with its `_internal` folder kept beside the EXE. The same run also uploads short-lived real UI screenshots for review.
+The installer performs a per-user install, adds a Start menu shortcut, and registers an uninstaller; it does not require administrator rights. The portable ZIP remains available as an alternative and contains only the app executable plus its required `_internal` runtime bundle—no source tree, firmware source, build tools, or CI reports. Keep `_internal` beside the EXE when extracting it. The same run also uploads short-lived real UI screenshots for review.
 
 These will be temporary Actions artifacts (14-day retention; GitHub sign-in/repository access may be required), **not a published GitHub Release**. If they expire, run the workflow manually for the desired branch.
 
