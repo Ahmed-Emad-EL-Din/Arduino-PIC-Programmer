@@ -26,9 +26,9 @@ class AppSettings:
     @property
     def font_size(self) -> int:
         try:
-            return max(9, min(14, int(self._get("font_size", 10))))
+            return max(9, min(14, int(self._get("font_size", 11))))
         except (TypeError, ValueError):
-            return 10
+            return 11
 
     @font_size.setter
     def font_size(self, value: int) -> None:
@@ -87,7 +87,7 @@ class AppSettings:
 
     @property
     def log_visible(self) -> bool:
-        return self._settings.value("log_visible", True, type=bool)
+        return self._settings.value("log_visible", False, type=bool)
 
     @log_visible.setter
     def log_visible(self, value: bool) -> None:

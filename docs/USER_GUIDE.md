@@ -7,7 +7,7 @@
 
 ## Status: candidate build, not a validated release
 
-The Windows workflow has passed and produced a temporary candidate artifact; see the README for the current download link and expiry details. No validated GitHub Release or physical hardware acceptance is available yet. Treat these steps as candidate behavior, not proof that programming is ready for use; do not perform destructive programming with an unvalidated build.
+The prior Windows workflow passed, but it predates the new installer packaging; the updated workflow has not yet been run. See the README for the artifact instructions once it succeeds. No validated GitHub Release or physical hardware acceptance is available. Treat these steps as candidate behavior, not proof that programming is ready for use; do not perform destructive programming with an unvalidated build.
 
 ## 1. Hardware you need
 
@@ -27,19 +27,20 @@ Follow the reference circuit (official Ho-Ro schematic):
 
 ## 2. First-time setup (once)
 
-### Step 1 — Flash Arduino Firmware…
-1. Menu **Programmer → Flash Arduino Firmware…**
-2. Pick your board (e.g. *Arduino Uno (ATmega328P)*) and the COM port
-   (use **Rescan** after plugging in).
-3. Press **Flash Firmware** and confirm. Keep USB connected.
-   * If Nano upload fails, select the *Old Bootloader* variant.
-   * Leonardo/Micro firmware upload is not implemented in the app yet because these boards re-enumerate their bootloader COM port; use Arduino IDE for that upload flow.
-4. The Windows workflow compiles supported board firmware and packages `avrdude`; it has passed CI. The temporary candidate is not a published release—see the README. Leonardo/Micro still require Arduino IDE for firmware upload.
+### Step 1 — Install the Windows candidate
+1. After the updated Windows workflow succeeds, open that run from the README's workflow link and download its candidate artifact. Earlier successful runs do not include the installer.
+2. Extract GitHub's outer ZIP. Verify `Arduino-PIC-Programmer-Setup-x64.exe` against its `.sha256` sidecar before installing.
+3. Run Setup. It installs per-user, adds a Start menu shortcut, and registers an uninstaller. This is still a temporary candidate—not a validated release.
+4. SmartScreen can warn on unsigned or not-yet-reputed apps. Do not disable it or bypass it for an unvalidated candidate; see the README's SmartScreen note.
 
-### Step 2 — Connect & verify
-1. Home page **Step 2 → Connect** (or `Ctrl+P`).
-2. The status chip turns green **Programmer: ✓ vX** — the handshake
-   passed. If it fails, close the Arduino Serial Monitor and retry.
+### Step 2 — Install ProgramPic firmware if needed
+1. In the **Programmer** card, select the Arduino model and port, then choose **Install Firmware…**.
+2. The dialog tells you if firmware upload isn't supported for the selected board. Leonardo/Micro must be flashed using Arduino IDE. For Nano, choose the matching old/new bootloader.
+3. Upload replaces the Arduino's current sketch. Keep USB connected and remove/reinstall the reset capacitor as directed by the dialog.
+
+### Step 3 — Connect & verify
+1. In the **Programmer** card, select the Arduino port and click **Connect** (or use `Ctrl+P`).
+2. A successful handshake shows the firmware version. If the port is busy, close Arduino Serial Monitor/other serial tools, select **Rescan**, and retry.
 
 ## 3. Every-day programming flow
 

@@ -6,7 +6,7 @@ from pathlib import Path
 # Use Qt's offscreen platform in CI unless the caller explicitly selected one.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QToolBar
 from PySide6.QtCore import Qt
 
 from core.mcu_db import lookup, all_devices
@@ -41,7 +41,7 @@ class TestGUIIntegration(unittest.TestCase):
     def setUp(self):
         self.win = MainWindow()
         self.win.resize(1380, 880)
-        self.win.apply_theme("dark", 10)
+        self.win.apply_theme("dark", self.win.settings.font_size)
         self.win.show()
 
     def tearDown(self):
@@ -49,6 +49,12 @@ class TestGUIIntegration(unittest.TestCase):
 
     def test_main_window_initialization(self):
         self.assertEqual(self.win.settings.theme, "dark")
+        toolbar = self.win.findChild(QToolBar, "mainToolbar")
+        self.assertIsNotNone(toolbar)
+        toolbar_actions = [action.text() for action in toolbar.actions() if not action.isSeparator()]
+        self.assertEqual(toolbar_actions, ["Open HEX…", "&Connect Programmer", "Program PIC…"])
+        self.assertFalse(self.win.progress.isVisible())
+        self.assertFalse(self.win.btn_cancel.isVisible())
         self.assertIsNotNone(self.win.circuit_panel)
         self.assertIsNotNone(self.win.log_pane)
         self.assertIsNotNone(self.win.cmb_board)
@@ -178,7 +184,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertEqual(self.win.settings.theme, "light")
         capture_window(self.win, "main-light-no-hardware.png")
         self.win.settings.theme = "dark"
-        self.win.apply_theme("dark", 10)
+        self.win.apply_theme("dark", self.win.settings.font_size)
 
     def test_circuit_drawer_integration(self):
         # Ensure circuit drawer produces valid SVG for the panel
