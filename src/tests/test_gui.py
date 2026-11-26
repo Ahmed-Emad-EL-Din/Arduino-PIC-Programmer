@@ -1,12 +1,14 @@
 import os
 import sys
+import threading
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 # Use Qt's offscreen platform in CI unless the caller explicitly selected one.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QToolBar
+from PySide6.QtWidgets import QApplication, QMessageBox, QToolBar
 from PySide6.QtCore import Qt
 
 from core.mcu_db import lookup, all_devices
@@ -195,6 +197,37 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertTrue(self.win.btn_detect.isEnabled())
         self.assertEqual(self.win.btn_detect.objectName(), "primary")
         self.assertIn("Blocked:", self.win.lbl_target_guidance.text())
+
+    def test_firmware_upload_runs_off_the_gui_thread_and_keeps_dialog_alive(self):
+        dlg_flash = FlashArduinoDialog(self.win.settings, None, self.win)
+        dlg_flash.board.setCurrentIndex(dlg_flash.board.findData("nano_new"))
+        dlg_flash.port.clear()
+        dlg_flash.port.addItem("USB-SERIAL CH340 (COM4)", "COM4")
+        release_upload = threading.Event()
+        flashed = []
+        dlg_flash.flashed.connect(lambda port, board: flashed.append((port, board)))
+
+        def fake_upload(_board, _port):
+            release_upload.wait(timeout=3)
+            return "avrdude: done"
+
+        with patch("gui.dialogs.flash_arduino.QMessageBox.warning", return_value=QMessageBox.StandardButton.Yes), \
+             patch("gui.dialogs.flash_arduino.QMessageBox.information"), \
+             patch("gui.dialogs.flash_arduino.flash_firmware", side_effect=fake_upload):
+            dlg_flash._flash()
+            worker = dlg_flash._worker
+            self.assertIsNotNone(worker)
+            self.assertTrue(worker.isRunning())
+            self.assertFalse(dlg_flash.flash_button.isEnabled())
+            self.assertFalse(dlg_flash.close_button.isEnabled())
+            release_upload.set()
+            self.assertTrue(worker.wait(5000))
+            QApplication.processEvents()
+
+        self.assertFalse(dlg_flash._uploading)
+        self.assertEqual(flashed, [("COM4", "nano_new")])
+        self.assertIn("uploaded", dlg_flash.status.text().lower())
+        dlg_flash.close()
 
     def test_flash_dialog_explains_unsupported_bootloader_uploads(self):
         dlg_flash = FlashArduinoDialog(self.win.settings, self.win.lane, self.win)
