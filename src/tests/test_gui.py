@@ -1,10 +1,10 @@
+import os
 import sys
 import unittest
-import os
+from pathlib import Path
 
-# Set environment variables for headless Qt6 rendering in tests
-os.environ["QT_QPA_PLATFORM"] = "offscreen"
-os.environ["LD_LIBRARY_PATH"] = "/tmp/qt_stubs"
+# Use Qt's offscreen platform in CI unless the caller explicitly selected one.
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
@@ -19,6 +19,17 @@ from gui.dialogs.settings_dialog import SettingsDialog
 from gui.dialogs.about import AboutDialog
 from app import APP_NAME, ORG_NAME
 from core.safety import build_dynamic_preflight
+
+
+def capture_window(window, filename):
+    """Save a real Qt window capture for CI review (never a synthetic mockup)."""
+    output_dir = Path(os.environ.get("ARDPICPROG_SCREENSHOT_DIR", "artifacts/ui"))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    QApplication.processEvents()
+    output_path = output_dir / filename
+    if not window.grab().save(str(output_path), "PNG"):
+        raise AssertionError(f"Could not write UI screenshot: {output_path}")
+
 
 class TestGUIIntegration(unittest.TestCase):
     @classmethod
@@ -42,6 +53,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertIsNotNone(self.win.log_pane)
         self.assertIsNotNone(self.win.cmb_board)
         self.assertIsNotNone(self.win.cmb_mcu)
+        capture_window(self.win, "main-dark-no-hardware.png")
 
     def test_circuit_panel_tabs(self):
         panel = self.win.circuit_panel
@@ -65,6 +77,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.win._refresh_actions()
         self.win.circuit_panel.set_hex_image(img)
         self.win.circuit_panel.tabs.setCurrentIndex(2)
+        capture_window(self.win, "hex-inspector-dark.png")
 
     def test_dialogs_instantiation(self):
         dlg_flash = FlashArduinoDialog(self.win.settings, self.win.lane, self.win)
@@ -84,6 +97,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.win.settings.theme = "light"
         self.win.apply_theme("light", 10)
         self.assertEqual(self.win.settings.theme, "light")
+        capture_window(self.win, "main-light-no-hardware.png")
         self.win.settings.theme = "dark"
         self.win.apply_theme("dark", 10)
 

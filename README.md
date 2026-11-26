@@ -2,7 +2,16 @@
 
 ## Windows build status
 
-**Candidate build:** the Windows CI build passed for commit `e5fdca3`. [Open the successful GitHub Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45725008411), then scroll to **Artifacts** and download **Arduino-PIC-Programmer-Windows-x64-candidate**. Extract the ZIP and launch `Arduino-PIC-Programmer.exe` from the extracted folder. Keep the adjacent `_internal` folder in place; the EXE will not work if moved by itself.
+**Candidate build:** the screenshot-enabled Windows CI build passed for commit `addb764`. [Open the successful GitHub Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45729144989), then scroll to **Artifacts** and download **Arduino-PIC-Programmer-Windows-x64-candidate**. GitHub downloads the Actions artifact as an outer ZIP; extract that first to find the candidate ZIP and its `.sha256` sidecar. In PowerShell, verify the candidate ZIP before extracting it:
+
+```powershell
+$zip = 'Arduino-PIC-Programmer-Windows-x64.zip'
+$expected = ((Get-Content ($zip + '.sha256') -Raw).Trim() -split ' +')[0].ToLowerInvariant()
+$actual = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { throw 'SHA-256 mismatch; do not use this file.' }
+```
+
+Then extract `Arduino-PIC-Programmer-Windows-x64.zip` and launch `Arduino-PIC-Programmer.exe`. Keep the adjacent `_internal` folder in place; the EXE will not work if moved by itself. The same Actions run also contains **Arduino-PIC-Programmer-UI-screenshots** for dark, light, and HEX-inspector UI captures.
 
 This is a temporary Actions artifact (14-day retention; GitHub sign-in/repository access may be required), **not a published GitHub Release**. If it expires, open the repository's **Actions → Windows desktop package** workflow, choose **Run workflow**, select the branch you want to build, and download the artifact from that successful run.
 

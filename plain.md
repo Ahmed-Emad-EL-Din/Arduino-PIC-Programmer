@@ -50,7 +50,9 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 
 - [x] Create/restore the app entry point, persistent settings, dialogs, theme, icons, and worker lane required by the workbench.
 - [x] Add test coverage for HEX parsing, backend adapter results, and SVG validity.
-- [ ] Run the full GUI integration suite on a supported Windows runner; Linux GUI tests cannot currently import Qt because this environment lacks system graphics libraries.
+- [x] Add real Qt window screenshot capture for dark/light home screens and the HEX inspector; add an Actions artifact upload step for review.
+- [x] Run the screenshot-enabled GUI integration suite on Windows; tests passed and screenshot artifact was uploaded from Actions run `45729144989`.
+- [ ] Visually inspect the generated image files for clipping, unreadable text, spacing, and misleading states; the artifact is available from that Actions run.
 - [ ] Test startup without hardware, settings file, or recent files; test corrupt settings and unavailable COM ports.
 - [ ] Test file open/drag-drop/save, recent files, preflight dismissal/acceptance, settings persistence, cancellation, and clean shutdown.
 - [ ] Test the UI at common Windows DPI scales and resolutions; ensure dialogs/buttons/text remain visible.
@@ -63,7 +65,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [x] Add `packaging/build_firmware.ps1` to compile board-specific ProgramPic images and stage avrdude/configuration for packaging.
 - [x] Add a Windows GitHub Actions candidate-build workflow that compiles, tests, packages, checks required files, and uploads a short-lived candidate artifact.
 - [x] Build the upstream ArdPicProg POSIX host locally and confirm its CLI help starts; this is only a source smoke test, not a Windows build.
-- [x] Run the Windows workflow for commit `e5fdca373c06c05ac94d43941562c08c41775a3e`; it completed successfully with passing tests, firmware compilation, packaging, and required-file checks (Actions run `45725008411`).
+- [x] Run the Windows workflow for commit `addb7648fefc9471ec7d2e9b688dbcef0a0319ab`; it completed successfully with passing tests, firmware compilation, packaging, required-file checks, screenshots, and generated/validated ZIP checksum (Actions run `45729144989`).
 - [x] Produce the portable onedir candidate artifact with `Arduino-PIC-Programmer.exe` at the package root; CI confirmed the executable and core bundled host/avrdude/firmware files exist. Clean-machine launch remains unverified (Phase 5).
 - [ ] Verify `ardpicprog.exe`, avrdude, its config and adjacent DLLs, all firmware images, Qt plugins, docs, and notices exist in the built package.
 - [ ] Verify bootloader handling for Uno/Nano/Mega/5V Pro Mini. Leonardo/Micro flashing through this dialog is explicitly unsupported until their bootloader port-reset flow is implemented; do not claim those upload paths work.
@@ -80,6 +82,21 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [ ] Test wrong target, unknown ID, no-ID target selection, empty socket, missing VPP, serial disconnect, cancel, and verify failure; confirm writes are blocked or report failure safely.
 - [ ] Have a second tester follow the guide from a clean setup and capture any mismatches.
 - [ ] Acceptance: all claimed workflows and failure cases are physically verified; no unresolved high-severity safety, data-loss, or launch issue remains.
+
+## Phase 5.5 — Professional polish, support, and trust
+
+- [ ] Review actual CI-generated UI screenshots for the main screen in dark/light themes and a HEX-inspector state; fix clipping, unreadable text, awkward spacing, and stale/unverified hardware claims. Artifact is in Actions run `45729144989` as `Arduino-PIC-Programmer-UI-screenshots`.
+- [ ] Verify empty/no-hardware, disconnected, loading, failure, success, and destructive-confirmation UI states; ensure errors are actionable and success is never reported prematurely.
+- [ ] Review keyboard navigation, accessible names/focus order, high-DPI scaling, minimum window size, and common 100%/150%/200% Windows display scales.
+- [ ] Verify app branding: final product name/version, executable metadata/icon, support URL, About dialog, and no development suffix in a release build.
+- [x] Generate and CI-validate a `.sha256` sidecar for every candidate ZIP (verified in run `45729144989`).
+- [ ] Independently verify the downloaded candidate checksum on a clean Windows PC and publish checksum next to final release assets.
+- [ ] Produce a dependency/license inventory (SBOM or equivalent), confirm all bundled notices/licenses are included, and document known limits and supported board/PIC combinations.
+- [x] Upgrade checkout, setup-python, and artifact-upload actions to current Node 24-compatible major releases; the latest workflow passed without check-run warnings.
+- [ ] Pin third-party GitHub Actions to immutable commit SHAs and add a routine dependency/security update process before public releases.
+- [ ] Decide and document Windows code-signing policy. If unsigned, clearly state SmartScreen may warn; never imply an unsigned build is signed/trusted.
+- [ ] Confirm portable settings/log locations, data retention, privacy behavior, and clean uninstall/removal instructions.
+- [ ] Acceptance: a new tester can find the download, understand the candidate/release status and risks, launch it, diagnose common errors, and verify the package/checksum without relying on chat support.
 
 ## Phase 6 — Publish the real release
 
@@ -98,7 +115,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - `git diff --check`: passed on the current changes.
 - PyInstaller spec path was corrected after an initial failed attempt. A Linux packaging attempt is still blocked because the sandbox Python lacks `libpython3.11.so.1.0`; this is not a Windows build result.
 - Full `pytest src/tests` collection is blocked in this Linux image because importing PySide6 fails on missing `libGL.so.1`; focused non-GUI tests pass. The Windows Actions workflow passed its test step, but this is not a clean-machine launch test.
-- Windows CI passed and produced a temporary candidate ZIP in Actions run `45725008411`; it is not a published Release asset. No clean-machine launch or physical hardware test has been performed.
+- Windows CI passed for commit `addb764` in Actions run `45729144989`; it produced a temporary candidate ZIP plus CI-checked SHA-256 sidecar and the UI screenshot artifact. None is a published Release asset. The local GUI test remains blocked by missing Linux `libGL.so.1`; no clean-machine Windows launch or physical hardware test has been performed.
 
 ## Remaining release blockers
 
