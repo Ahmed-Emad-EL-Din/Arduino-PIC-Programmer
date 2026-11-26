@@ -99,8 +99,16 @@ def flash_firmware(board_key: str, port: str) -> str:
         launch_options = {}
         if os.name == "nt":
             launch_options["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        result = subprocess.run(command, capture_output=True, text=True, timeout=120,
-                                check=False, **launch_options)
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=180,
+            check=False,
+            **launch_options,
+        )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise FlashError(f"Could not run avrdude: {exc}") from exc
     output = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()

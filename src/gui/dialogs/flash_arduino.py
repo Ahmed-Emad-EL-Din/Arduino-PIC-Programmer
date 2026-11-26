@@ -1,11 +1,22 @@
-"""Arduino firmware upload dialog."""
+"""Asynchronous Arduino firmware upload dialog."""
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-                               QLabel, QMessageBox, QPushButton, QVBoxLayout)
-from core.avrdude import BOARDS, BOARD_BY_KEY, FlashError, flash_firmware
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QLabel,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QVBoxLayout,
+)
+
+from core.avrdude import BOARDS, BOARD_BY_KEY, flash_firmware
 from core.serial_link import LinkError, list_serial_ports
+from gui.workers import Worker
 
 
 class FlashArduinoDialog(QDialog):
@@ -15,18 +26,30 @@ class FlashArduinoDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Flash ProgramPic firmware")
         self.settings = settings
+        self.lane = lane
+        self._worker: Worker | None = None
+        self._upload_error = ""
+        self._upload_output = ""
+        self._upload_succeeded = False
+        self._upload_port = ""
+        self._upload_board_key = ""
+        self._upload_board_label = ""
+        self._uploading = False
         self.setMinimumWidth(520)
+
         layout = QVBoxLayout(self)
         note = QLabel(
-            "Uploading replaces the sketch on the selected Arduino. The board must match the selected bootloader setting. "
-            "Remove any reset capacitor while flashing, then reinstall it only after upload completes."
+            "Uploading replaces the sketch on the selected Arduino. Choose the matching board and bootloader. "
+            "Remove any reset capacitor while flashing, then reinstall it only after upload completes. "
+            "CH340/CH341 Nano clones use their normal Windows COM port."
         )
         note.setWordWrap(True)
         layout.addWidget(note)
+
         form = QFormLayout()
         self.board = QComboBox()
-        for b in BOARDS:
-            self.board.addItem(b.label, b.key)
+        for board in BOARDS:
+            self.board.addItem(board.label, board.key)
         idx = self.board.findData(settings.board_key)
         self.board.setCurrentIndex(max(0, idx))
         self.port = QComboBox()
@@ -36,6 +59,7 @@ class FlashArduinoDialog(QDialog):
         form.addRow("Port:", self.port)
         form.addRow("", self.rescan)
         layout.addLayout(form)
+
         self.board_note = QLabel()
         self.board_note.setObjectName("warn")
         self.board_note.setWordWrap(True)
@@ -43,12 +67,20 @@ class FlashArduinoDialog(QDialog):
         self.status = QLabel("")
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)
+        self.progress.setTextVisible(False)
+        self.progress.hide()
+        layout.addWidget(self.progress)
+
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         self.flash_button = buttons.addButton("Flash Firmware", QDialogButtonBox.ButtonRole.ApplyRole)
+        self.close_button = buttons.button(QDialogButtonBox.StandardButton.Close)
         self.flash_button.clicked.connect(self._flash)
         buttons.rejected.connect(self.reject)
-        buttons.button(QDialogButtonBox.StandardButton.Close).clicked.connect(self.reject)
+        self.close_button.clicked.connect(self.reject)
         layout.addWidget(buttons)
+
         self.board.currentIndexChanged.connect(self._update_board_support)
         self._update_board_support()
         self._rescan()
@@ -62,16 +94,15 @@ class FlashArduinoDialog(QDialog):
                 "Use Arduino IDE to install ProgramPic; the board can still run it afterward."
             )
             self.board_note.show()
-            self.flash_button.setEnabled(False)
             self.flash_button.setToolTip("Use Arduino IDE for Leonardo/Micro firmware upload.")
         else:
             self.board_note.clear()
             self.board_note.hide()
-            self.flash_button.setEnabled(True)
             self.flash_button.setToolTip("")
+        self.flash_button.setEnabled(supported and not self._uploading)
 
     def _rescan(self) -> None:
-        previous = self.settings.port
+        previous = str(self.port.currentData() or self.settings.port or "")
         self.port.clear()
         try:
             ports = list_serial_ports()
@@ -86,36 +117,138 @@ class FlashArduinoDialog(QDialog):
         if index >= 0:
             self.port.setCurrentIndex(index)
 
+    def _set_uploading(self, active: bool) -> None:
+        self._uploading = active
+        self.board.setEnabled(not active)
+        self.port.setEnabled(not active)
+        self.rescan.setEnabled(not active)
+        self.close_button.setEnabled(not active)
+        self.progress.setVisible(active)
+        self._update_board_support()
+
+    @staticmethod
+    def _output_excerpt(output: str, limit: int = 5000) -> str:
+        output = (output or "").strip()
+        if len(output) <= limit:
+            return output
+        return "[Earlier avrdude output omitted]\n" + output[-limit:]
+
+    def _on_upload_progress(self, message: str) -> None:
+        if message:
+            self.status.setText(message)
+
+    def _on_upload_succeeded(self, output) -> None:
+        self._upload_succeeded = True
+        self._upload_output = str(output or "")
+        self.settings.board_key = self._upload_board_key
+        self.settings.port = self._upload_port
+        self.settings.sync()
+        self.status.setText(
+            f"Firmware upload completed for {self._upload_board_label} on {self._upload_port}."
+        )
+        self.flashed.emit(self._upload_port, self._upload_board_key)
+
+    def _on_upload_failed(self, message: str) -> None:
+        self._upload_error = str(message)
+        self.status.setText(self._output_excerpt(self._upload_error))
+
+    def _on_upload_finished(self) -> None:
+        self._worker = None
+        self._set_uploading(False)
+        if self._upload_error:
+            QMessageBox.critical(
+                self,
+                "Firmware upload failed",
+                self._output_excerpt(self._upload_error),
+            )
+        elif self._upload_succeeded:
+            summary = (
+                f"ProgramPic firmware uploaded to {self._upload_board_label} "
+                f"on {self._upload_port}."
+            )
+            details = self._output_excerpt(self._upload_output)
+            QMessageBox.information(
+                self,
+                "Firmware uploaded",
+                summary + (f"\n\n{details}" if details else ""),
+            )
+
     def _flash(self) -> None:
+        if self._uploading:
+            return
+        if self.lane is not None and self.lane.busy:
+            QMessageBox.information(
+                self,
+                "Programmer busy",
+                "Wait for the current hardware operation to finish before uploading firmware.",
+            )
+            return
+
         key = str(self.board.currentData() or "")
         port = str(self.port.currentData() or "")
         if not port:
             QMessageBox.warning(self, "Select a port", "Connect the Arduino and select its serial port.")
             return
         board = BOARD_BY_KEY.get(key)
-        if board is None:
+        if board is None or not board.firmware_flash_supported:
             return
         answer = QMessageBox.warning(
-            self, "Upload firmware?",
+            self,
+            "Upload firmware?",
             f"Upload ProgramPic firmware to {board.label} on {port}? This replaces the sketch on that board.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        self.flash_button.setEnabled(False)
-        self.status.setText("Uploading firmware…")
+
+        self._upload_error = ""
+        self._upload_output = ""
+        self._upload_succeeded = False
+        self._upload_port = port
+        self._upload_board_key = key
+        self._upload_board_label = board.label
+        self.status.setText(
+            f"Uploading to {board.label} on {port} at {board.bootloader_baud} baud. "
+            "Keep the board connected; the window will remain responsive."
+        )
+        self._set_uploading(True)
+
+        def upload(progress, _percent, _cancel):
+            progress(f"Opening {port} and uploading ProgramPic…")
+            return flash_firmware(key, port)
+
+        worker = Worker(upload, name="Firmware upload", parent=self)
+        self._worker = worker
+        worker.progressed.connect(self._on_upload_progress)
+        worker.succeeded.connect(self._on_upload_succeeded)
+        worker.failed.connect(self._on_upload_failed)
+        worker.finished.connect(self._on_upload_finished)
         try:
-            output = flash_firmware(key, port)
-        except FlashError as exc:
-            self.status.setText(str(exc))
-            QMessageBox.critical(self, "Firmware upload failed", str(exc))
-        else:
-            self.settings.board_key = key
-            self.settings.port = port
-            self.settings.sync()
-            self.status.setText(output or "Firmware upload completed.")
-            self.flashed.emit(port, key)
-            QMessageBox.information(self, "Firmware uploaded", self.status.text())
-        finally:
-            self.flash_button.setEnabled(True)
+            if self.lane is not None:
+                self.lane.start(worker)
+            else:
+                worker.start()
+        except RuntimeError as exc:
+            self._worker = None
+            self._upload_error = str(exc)
+            self._set_uploading(False)
+            self.status.setText(self._upload_error)
+            QMessageBox.critical(self, "Firmware upload failed", self._upload_error)
+
+    def reject(self) -> None:
+        if self._worker is not None and self._worker.isRunning():
+            self.status.setText(
+                "Upload is still running. Keep the Arduino connected until avrdude finishes."
+            )
+            return
+        super().reject()
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        if self._worker is not None and self._worker.isRunning():
+            self.status.setText(
+                "Upload is still running. Keep the Arduino connected until avrdude finishes."
+            )
+            event.ignore()
+            return
+        super().closeEvent(event)
