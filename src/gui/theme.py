@@ -56,6 +56,9 @@ def build_qss(t: ThemeTokens, font_size: int = 10) -> str:
     QLabel#guidance {{ color: {t.subtext}; padding: 5px 8px; }}
     QLabel#guidanceWarn {{ color: {t.warning}; background: {t.warning_surface}; border-left: 3px solid {t.warning}; border-radius: 4px; padding: 7px 9px; }}
     QLabel#guidanceOk {{ color: {t.success}; background: {t.surface}; border-left: 3px solid {t.success}; border-radius: 4px; padding: 7px 9px; }}
+    QToolButton#disclosureButton {{ color: {t.accent}; background: transparent; border: 0; padding: 5px 2px; font-weight: 600; }}
+    QToolButton#disclosureButton:hover {{ color: {t.accent_hover}; }}
+    QFrame#targetToolsPanel {{ background: {t.raised}; border: 1px solid {t.border}; border-radius: 6px; }}
     QPushButton {{ background: {t.raised}; border: 1px solid {t.border}; border-radius: 6px; padding: 7px 11px; min-height: 22px; }}
     QPushButton:hover {{ border-color: {t.accent}; }}
     QPushButton:pressed {{ background: {t.border}; }}

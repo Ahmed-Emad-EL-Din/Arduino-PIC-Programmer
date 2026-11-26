@@ -49,11 +49,12 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 ## Phase 3 — Desktop UI and automated QA
 
 - [x] Create/restore the app entry point, persistent settings, dialogs, theme, icons, and worker lane required by the workbench.
-- [x] Add test coverage for HEX parsing, backend adapter results, and SVG validity.
+- [x] Add test coverage for HEX parsing, backend adapter results, SVG validity, and the current contextual-control/disclosure states.
 - [x] Add real Qt window screenshot capture for dark/light home screens and the HEX inspector; add an Actions artifact upload step for review.
-- [x] Run the screenshot-enabled GUI integration suite on Windows after the current UX refinements; the final workflow passed in Actions run `45807577569`.
+- [x] Run the screenshot-enabled GUI integration suite on Windows after this ease-of-use pass; the workflow passed in Actions run `45819350412`.
 - [x] Generate fresh real-app screenshots for dark/light no-hardware home and the HEX inspector; artifact `Arduino-PIC-Programmer-UI-screenshots` is attached to that run.
-- [ ] Visually inspect those images for clipping, unreadable text, spacing, and misleading states. Downloading the signed artifact archive still fails with EOF; visual sign-off remains pending.
+- [x] Run the new connection/disclosure GUI tests on Windows as part of that suite.
+- [ ] Visually inspect the fresh screenshots for clipping, unreadable text, spacing, and misleading states. Signed artifact download still fails with EOF; visual sign-off remains pending.
 - [ ] Test startup without hardware, settings file, or recent files; test corrupt settings and unavailable COM ports.
 - [ ] Test file open/drag-drop/save, recent files, preflight dismissal/acceptance, settings persistence, cancellation, and clean shutdown.
 - [ ] Test the UI at common Windows DPI scales and resolutions; ensure dialogs/buttons/text remain visible.
@@ -79,9 +80,10 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [x] Replace unsupported “0 V/safe/powered off” UI claims with explicit “voltage not measured” guidance; distinguish selected target from the programmer's reported model and explain the host's raw-ID limitation.
 - [x] Make programming summaries reflect the actual read-back and calibration-preservation settings; block erase when calibration preservation is unchecked and no explicit calibration backup is supplied. Core regression tests pass.
 - [x] Rerun the Windows GUI tests after the copy/confirmation changes; the first run exposed a missing HEX-warning caveat, which was fixed. Updated Windows run `45761718540` passes.
-- [ ] Visually inspect the fresh screenshots from that run before marking UI acceptance.
+- [ ] Visually inspect the fresh screenshots from passing run `45819350412`; the signed screenshot download still returns EOF.
 - [x] First launch: the numbered board/port → target → HEX flow is visible; no-port guidance gives the next step, and the user guide is reachable from Help.
-- [ ] Board and port card: distinguish board selection from board detection; missing ports/rescan and busy state are now explained. Still review firmware-upload limitations and behavior with a busy port.
+- [ ] Board and port card: distinguish board selection from board detection; missing ports/rescan and busy state are explained. Review firmware-upload limitations and busy-port recovery.
+- [x] Ease-of-use pass: Connect stays disabled until a port is selected, Connect/Disconnect swap in place, and optional Blank Check/Read Backup/Erase tools are collapsed behind “More target actions.” The Windows GUI tests for these states pass in run `45819350412`.
 - [x] Programmer connection: show the selected port and handshake-reported firmware separately from target identity; show connect/disconnect state and a persistent next-step hint.
 - [x] Target card: label the MCU as selected, separate ProgramPic's reported model, disclose raw-ID limitations, and warn for no-ID/manual marking or unverified wiring. A reported-model mismatch now blocks hardware actions until resolved.
 - [x] HEX card: show filename and region counts; identify fit/mismatch inline, block Program/Verify for out-of-range images, and explain that a memory-map fit does not verify hardware identity or wiring.
@@ -100,7 +102,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [ ] Standardize terminology, button verbs, status colors/icons, spacing, and dialog button order; remove jargon or define it at first use.
 
 ### Real-image review / visual regression
-- [x] Capture real Qt app windows (not mockups): dark no-hardware home, light no-hardware home, and dark HEX inspector. Fresh screenshots are in the [passing Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45807577569), artifact `Arduino-PIC-Programmer-UI-screenshots`.
+- [x] Capture real Qt app windows (not mockups): dark no-hardware home, light no-hardware home, and dark HEX inspector. Fresh screenshots are in the [passing Actions run](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/runs/45819350412), artifact `Arduino-PIC-Programmer-UI-screenshots`.
 - [ ] Download and inspect the fresh Windows captures at 100% and enlarged. `gh run download` currently receives EOF from the signed artifact host.
 - [ ] Keep screenshots as a short-lived CI artifact unless approved documentation images are deliberately curated; don't commit raw build/test output accidentally.
 - [ ] Acceptance: a first-time user can identify the next safe step, understand what the app knows versus what it cannot measure, and recover from common errors without guessing.
@@ -156,17 +158,17 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 
 ## Verification run so far
 
-- `python -m compileall -q src app`: passed after the current UX changes.
+- `python -m compileall -q src app`: passed after the current ease-of-use changes.
 - `PYTHONPATH=src .venv/bin/python -m pytest -q src/tests/test_ihex.py src/tests/test_programmer_adapter.py src/tests/test_svg.py src/tests/test_safety.py`: **18 passed** locally.
-- Current GUI integration tests cannot run in this Linux sandbox: PySide6 imports fail because system `libGL.so.1` is absent. Windows run `45806778512` caught two stale assertions; run `45807183480` caught a tooltip capitalization mismatch. All are fixed, and final run `45807577569` passes the full screenshot-enabled test suite and Windows packaging workflow.
+- Current GUI integration tests cannot run in this Linux sandbox: PySide6 imports fail because system `libGL.so.1` is absent. Windows run `45819350412` passed the screenshot-enabled GUI suite, including no-port Connect gating, contextual Connect/Disconnect controls, and advanced-action disclosure.
 - `bash packaging/build_host_posix.sh`: built the upstream C++ helper into ignored `tools/ardpicprog`; CLI help smoke test passed.
 - `git diff --check`: passed on the current changes.
 - PyInstaller spec path was corrected after an initial failed attempt. A Linux packaging attempt is still blocked because the sandbox Python lacks `libpython3.11.so.1.0`; this is not a Windows build result.
-- Latest Windows CI passed for commit `302f86d` in Actions run `45807577569`; it produced a candidate ZIP, SHA-256 sidecar, test report, and fresh UI screenshots. These are temporary Actions artifacts, not a published Release. No clean-machine Windows launch or physical hardware test has been performed.
+- Windows CI passed at PR head `8b61be2` in run `45819350412`; it produced a candidate ZIP, SHA-256 sidecar, test report, and fresh UI screenshots. These are temporary Actions artifacts, not a published Release. No clean-machine Windows launch or physical hardware test has been performed.
 
 ## Remaining release blockers
 
-- [x] Run the Windows build/test workflow after inline-guidance, mismatch-gating, theme, and regression-test changes (run `45807577569`).
+- [x] Run the Windows build/test workflow after inline-guidance, mismatch-gating, theme, and ease-of-use changes (run `45819350412`).
 - [ ] Physically validate the adapter and safety behavior with supported hardware.
 - [ ] Publish and test a real GitHub Release asset.
 
