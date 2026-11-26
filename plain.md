@@ -15,8 +15,8 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [x] Clarify that the official shield's stated 16–20 V input must not be confused with this independent 24 V reference circuit.
 - [x] Parse the SVG as XML and run diff whitespace checks.
 - [x] Render and visually inspect the circuit SVG; verify feedback resistor/capacitor connections and that labels do not overlap.
-- [x] Run the Windows GUI/build workflow on this change: PR run `45824025728` passed tests, packaging, and uploaded screenshots plus candidate artifacts.
-- [ ] Visually inspect real application screenshots. Download of the latest screenshot artifact from run `45824025728` still ends with EOF; do not claim visual sign-off without opening the actual captures.
+- [x] Run the Windows GUI/build workflow on this change: PR run `45825021860` passed GUI tests, package inventory checks, and no-hardware packaged startup; it uploaded screenshots plus candidate artifacts.
+- [ ] Visually inspect real application screenshots. Download of the latest screenshot artifact from run `45825021860` still ends with EOF; do not claim visual sign-off without opening the actual captures.
 - [ ] Bench-validate the supply and programmer hardware before claiming electrical suitability.
 
 - The ZIP/package must include the Qt runtime, ArdPicProg host helper, firmware images, avrdude and its configuration/dependencies/notices, user guide, and required license notices.
@@ -42,7 +42,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [x] Add ignore rules for generated tools, firmware, build output, environments, and Python caches.
 - [x] Add a safe Python adapter that uses the upstream host for serial operations, verifies written addresses by read-back, and does not fabricate measured chip IDs from expected database values.
 - [x] Add explicit unverified-pinout warnings instead of inventing package pin numbers, and an extra manual-identity warning for no-ID devices.
-- [ ] Review the newly authored Python modules with a clean runtime import and Windows GUI startup test; local GUI import is currently blocked by missing Linux system libraries (`libGL`, `libEGL`, `libxkbcommon`, `libdbus`).
+- [x] Review module imports and Windows GUI startup: full CI suite passed and the packaged app stayed open in the no-hardware smoke test (run `45825021860`). Local GUI imports remain blocked by missing Linux system libraries (`libGL`, `libEGL`, `libxkbcommon`, `libdbus`).
 - [ ] Restore/validate exact pin maps for every MCU before describing every target's physical wiring as verified.
 - [ ] Acceptance: a clean checkout starts the complete desktop UI; every internal import resolves; no dummy hardware operation or unverified destructive path remains.
 
@@ -65,14 +65,14 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [x] Create/restore the app entry point, persistent settings, dialogs, theme, icons, and worker lane required by the workbench.
 - [x] Add test coverage for HEX parsing, backend adapter results, SVG validity, and the current contextual-control/disclosure states.
 - [x] Add real Qt window screenshot capture for dark/light home screens and the HEX inspector; add an Actions artifact upload step for review.
-- [x] Run the screenshot-enabled GUI integration suite on Windows for this change; run `45824025728` passed.
-- [x] Generate fresh real-app screenshots for dark/light no-hardware home and the HEX inspector; artifact `Arduino-PIC-Programmer-UI-screenshots` is attached to run `45824025728`.
+- [x] Run the screenshot-enabled GUI integration suite on Windows for this change; run `45825021860` passed.
+- [x] Generate fresh real-app screenshots for dark/light no-hardware home and the HEX inspector; artifact `Arduino-PIC-Programmer-UI-screenshots` is attached to run `45825021860`.
 - [x] Run the new connection/disclosure GUI tests on Windows as part of that suite.
-- [ ] Visually inspect the fresh screenshots from run `45824025728` for clipping, readability, spacing, and misleading states. Artifact download still fails with EOF; visual sign-off remains pending.
+- [ ] Visually inspect the fresh screenshots from run `45825021860` for clipping, readability, spacing, and misleading states. Artifact download still fails with EOF; visual sign-off remains pending.
 - [ ] Test startup without hardware, settings file, or recent files; test corrupt settings and unavailable COM ports.
 - [ ] Test file open/drag-drop/save, recent files, preflight dismissal/acceptance, settings persistence, cancellation, and clean shutdown.
 - [ ] Test the UI at common Windows DPI scales and resolutions; ensure dialogs/buttons/text remain visible.
-- [ ] Acceptance: clean Windows runner passes all automated tests; application launches with no console and without hardware connected.
+- [x] Acceptance: Windows CI passes the full automated suite and the packaged GUI stays open in an offscreen no-hardware smoke launch (run `45825021860`). Clean-machine interactive launch is still a Phase 5 requirement.
 
 ## Phase 3.5 — Detailed UX improvement and visual acceptance
 
@@ -94,10 +94,10 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [x] Replace unsupported “0 V/safe/powered off” UI claims with explicit “voltage not measured” guidance; distinguish selected target from the programmer's reported model and explain the host's raw-ID limitation.
 - [x] Make programming summaries reflect the actual read-back and calibration-preservation settings; block erase when calibration preservation is unchecked and no explicit calibration backup is supplied. Core regression tests pass.
 - [x] Rerun the Windows GUI tests after the copy/confirmation changes; the first run exposed a missing HEX-warning caveat, which was fixed. Updated Windows run `45761718540` passes.
-- [ ] Visually inspect the fresh screenshots from passing run `45824025728`; the signed screenshot download still returns EOF.
+- [ ] Visually inspect the fresh screenshots from passing run `45825021860`; the signed screenshot download still returns EOF.
 - [x] First launch: the numbered board/port → target → HEX flow is visible; no-port guidance gives the next step, and the user guide is reachable from Help.
 - [x] Board and port card: board selection is labeled as a wiring reference, missing ports point to Rescan, busy serial-port errors give recovery steps, and Leonardo/Micro firmware upload limits are shown before flashing. Windows GUI regression tests cover the upload limitation and port-error guidance.
-- [x] Ease-of-use pass: Connect stays disabled until a port is selected, Connect/Disconnect swap in place, and optional Blank Check/Read Backup/Erase tools are collapsed behind “More target actions.” The Windows GUI tests for these states pass in run `45824025728`.
+- [x] Ease-of-use pass: Connect stays disabled until a port is selected, Connect/Disconnect swap in place, and optional Blank Check/Read Backup/Erase tools are collapsed behind “More target actions.” The Windows GUI tests for these states pass in run `45825021860`.
 - [x] Programmer connection: show the selected port and handshake-reported firmware separately from target identity; show connect/disconnect state and a persistent next-step hint.
 - [x] Target card: label the MCU as selected, separate ProgramPic's reported model, disclose raw-ID limitations, and warn for no-ID/manual marking or unverified wiring. A reported-model mismatch now blocks hardware actions until resolved.
 - [x] HEX card: show filename and region counts; identify fit/mismatch inline, block Program/Verify for out-of-range images, and explain that a memory-map fit does not verify hardware identity or wiring.
@@ -130,7 +130,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [x] Build the upstream ArdPicProg POSIX host locally and confirm its CLI help starts; this is only a source smoke test, not a Windows build.
 - [x] Run the Windows workflow for commit `f7638bed1f681e50c47502de97f4911dfcfe6f51`; it completed successfully with passing tests, firmware compilation, packaging, required-file checks, screenshots, test report, and generated/validated ZIP checksum (Actions run `45761718540`).
 - [x] Produce the portable onedir candidate artifact with `Arduino-PIC-Programmer.exe` at the package root; CI confirmed the executable and core bundled host/avrdude/firmware files exist. Clean-machine launch remains unverified (Phase 5).
-- [ ] Verify `ardpicprog.exe`, avrdude, its config and adjacent DLLs, all firmware images, Qt plugins, docs, and notices exist in the built package.
+- [x] Verify `ardpicprog.exe`, avrdude/config and adjacent DLLs, all seven firmware images, the Qt Windows platform plugin, user guide, reference schematic, and required notices exist in the built package (run `45825021860`).
 - [ ] Verify bootloader handling for Uno/Nano/Mega/5V Pro Mini. Leonardo/Micro flashing through this dialog is explicitly unsupported until their bootloader port-reset flow is implemented; do not claim those upload paths work.
 - [ ] Acceptance: candidate package launches on a clean Windows 10/11 x64 machine, every required input is present, and missing ports/files produce actionable errors.
 
@@ -148,7 +148,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 
 ## Phase 5.5 — Product trust, support, and final QA
 
-- [ ] Review actual UI screenshots from the latest passing Windows run `45824025728` (artifact download currently ends with EOF); review clipping, spacing, text legibility, and hardware-state claims.
+- [ ] Review actual UI screenshots from the latest passing Windows run `45825021860` (artifact download currently ends with EOF); review clipping, spacing, text legibility, and hardware-state claims.
 - [ ] Verify empty/no-hardware, disconnected, loading, failure, success, and destructive-confirmation UI states; ensure errors are actionable and success is never reported prematurely.
 - [ ] Review keyboard navigation, accessible names/focus order, high-DPI scaling, minimum window size, and common 100%/150%/200% Windows display scales.
 - [ ] Verify app branding: final product name/version, executable metadata/icon, support URL, About dialog, and no development suffix in a release build.
@@ -174,11 +174,11 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 
 - `python -m compileall -q src app`: passed after the current ease-of-use changes.
 - `PYTHONPATH=src .venv/bin/python -m pytest -q src/tests/test_ihex.py src/tests/test_programmer_adapter.py src/tests/test_svg.py src/tests/test_safety.py`: **18 passed** locally.
-- Current GUI integration tests cannot run in this Linux sandbox: PySide6 imports fail because system `libGL.so.1` is absent. Windows run `45824025728` passed the screenshot-enabled GUI suite, including no-port Connect gating, contextual Connect/Disconnect controls, advanced-action disclosure, and this PR's updated guidance labels.
+- Current GUI integration tests cannot run in this Linux sandbox: PySide6 imports fail because system `libGL.so.1` is absent. Windows run `45825021860` passed the screenshot-enabled GUI suite, including no-port Connect gating, contextual Connect/Disconnect controls, advanced-action disclosure, unsupported-board firmware guidance, and port-error recovery hints.
 - `bash packaging/build_host_posix.sh`: built the upstream C++ helper into ignored `tools/ardpicprog`; CLI help smoke test passed.
 - `git diff --check`: passed on the current changes.
 - PyInstaller spec path was corrected after an initial failed attempt. A Linux packaging attempt is still blocked because the sandbox Python lacks `libpython3.11.so.1.0`; this is not a Windows build result.
-- Windows CI passed at PR head `37c1843` in run `45824025728`; it produced a candidate ZIP, SHA-256 sidecar, test report, and fresh UI screenshots. These are temporary Actions artifacts, not a published Release. The screenshots remain unreviewed because artifact downloads end with EOF. No clean-machine Windows launch or physical hardware test has been performed.
+- Windows CI passed at PR head `23044ba` in run `45825021860`; it produced a candidate ZIP, SHA-256 sidecar, test report, and fresh UI screenshots. Package inventory checks and a no-hardware packaged-app launch smoke test passed. These are temporary Actions artifacts, not a published Release. The screenshots remain unreviewed because artifact downloads end with EOF. No clean-machine Windows launch or physical hardware test has been performed.
 
 ## Remaining release blockers
 
