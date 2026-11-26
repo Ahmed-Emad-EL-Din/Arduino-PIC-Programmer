@@ -34,7 +34,7 @@ class SettingsDialog(QDialog):
         self.baud = QSpinBox()
         self.baud.setRange(9600, 1000000)
         self.baud.setValue(settings.baud)
-        self.baud.setToolTip("Serial speed for the Arduino host connection; use the speed supported by the installed ProgramPic firmware.")
+        self.baud.setToolTip("ProgramPic host-link speed; default firmware now uses 9600 baud. This is separate from the Nano bootloader upload speed.")
         form.addRow("Serial speed:", self.baud)
         self.verify = QCheckBox("Read back and compare after programming")
         self.verify.setChecked(settings.auto_verify)

@@ -26,32 +26,66 @@ class TestFirmwareUpload(unittest.TestCase):
         result = SimpleNamespace(returncode=0, stdout="avrdude: done", stderr="")
         with patch("core.avrdude._resource_root", return_value=self.root), \
              patch("core.avrdude.subprocess.run", return_value=result) as run:
-            output = flash_firmware("nano_new", "COM4")
+            outcome = flash_firmware("nano_new", "COM4")
 
         args = run.call_args.args[0]
-        self.assertIn("COM4", args)
         self.assertEqual(args[args.index("-P") + 1], "COM4")
         self.assertEqual(args[args.index("-b") + 1], "115200")
         self.assertEqual(run.call_args.kwargs["timeout"], 180)
         self.assertEqual(run.call_args.kwargs["encoding"], "utf-8")
         self.assertEqual(run.call_args.kwargs["errors"], "replace")
-        self.assertIn("avrdude: done", output)
+        self.assertIn("avrdude: done", outcome.output)
+        self.assertEqual(outcome.baud, 115200)
+        self.assertEqual(outcome.board_key, "nano_new")
+        self.assertFalse(outcome.fallback_used)
 
     def test_old_nano_bootloader_uses_57600(self):
         result = SimpleNamespace(returncode=0, stdout="", stderr="upload complete")
         with patch("core.avrdude._resource_root", return_value=self.root), \
              patch("core.avrdude.subprocess.run", return_value=result) as run:
-            flash_firmware("nano_old", "COM12")
+            outcome = flash_firmware("nano_old", "COM12")
         args = run.call_args.args[0]
         self.assertEqual(args[args.index("-P") + 1], "COM12")
         self.assertEqual(args[args.index("-b") + 1], "57600")
+        self.assertEqual(outcome.board_key, "nano_old")
+        self.assertFalse(outcome.fallback_used)
 
-    def test_avrdude_failure_is_reported_without_crashing_the_caller(self):
-        result = SimpleNamespace(returncode=1, stdout="", stderr="not in sync")
+    def test_nano_upload_retries_the_other_bootloader_baud_after_sync_failure(self):
+        first = SimpleNamespace(returncode=1, stdout="", stderr="stk500_getsync: not in sync")
+        retry = SimpleNamespace(returncode=0, stdout="avrdude: done", stderr="")
         with patch("core.avrdude._resource_root", return_value=self.root), \
-             patch("core.avrdude.subprocess.run", return_value=result):
-            with self.assertRaisesRegex(FlashError, "not in sync"):
+             patch("core.avrdude.subprocess.run", side_effect=[first, retry]) as run:
+            outcome = flash_firmware("nano_old", "COM4")
+
+        self.assertEqual(run.call_count, 2)
+        first_args = run.call_args_list[0].args[0]
+        retry_args = run.call_args_list[1].args[0]
+        self.assertEqual(first_args[first_args.index("-b") + 1], "57600")
+        self.assertEqual(retry_args[retry_args.index("-b") + 1], "115200")
+        self.assertEqual(outcome.board_key, "nano_new")
+        self.assertEqual(outcome.baud, 115200)
+        self.assertTrue(outcome.fallback_used)
+        self.assertIn("succeeded using the alternate 115200-baud", outcome.output)
+
+    def test_both_nano_speeds_are_included_in_copyable_failure_details(self):
+        first = SimpleNamespace(returncode=1, stdout="", stderr="not in sync at 57600")
+        retry = SimpleNamespace(returncode=1, stdout="", stderr="not in sync at 115200")
+        with patch("core.avrdude._resource_root", return_value=self.root), \
+             patch("core.avrdude.subprocess.run", side_effect=[first, retry]):
+            with self.assertRaises(FlashError) as caught:
+                flash_firmware("nano_old", "COM4")
+        message = str(caught.exception)
+        self.assertIn("57600 and 115200 baud", message)
+        self.assertIn("not in sync at 57600", message)
+        self.assertIn("not in sync at 115200", message)
+
+    def test_non_sync_avrdude_failure_is_reported(self):
+        result = SimpleNamespace(returncode=1, stdout="", stderr="COM4 access denied")
+        with patch("core.avrdude._resource_root", return_value=self.root), \
+             patch("core.avrdude.subprocess.run", return_value=result) as run:
+            with self.assertRaisesRegex(FlashError, "COM4 access denied"):
                 flash_firmware("nano_new", "COM4")
+        run.assert_called_once()
 
     def test_avrdude_timeout_becomes_a_user_facing_flash_error(self):
         timeout = subprocess.TimeoutExpired("avrdude", 180)

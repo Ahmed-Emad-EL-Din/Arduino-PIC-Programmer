@@ -15,6 +15,8 @@ Run Setup for a normal per-user installation—no administrator rights required.
 
 Artifacts are temporary (14-day retention; GitHub sign-in/repository access may be required), **not published GitHub Releases**. The installer ZIP is not a portable app; run its setup executable to install normally.
 
+After updating, use **Install Firmware…** once to upload the matching ProgramPic sketch before connecting; the host link now defaults to 9600 baud. Nano bootloader flashing uses its separate standard rate (115200 or 57600), and the app retries both after a synchronization error.
+
 ### Why Windows may show “Windows protected your PC”
 
 That dialog is Microsoft Defender SmartScreen's **publisher/file-reputation** warning. It commonly appears for a new, unsigned download; it is not by itself a malware detection. Packaging the EXE inside an installer or ZIP does not remove the warning. This workflow signs app binaries and the installer only for version-tag builds when a trusted Authenticode certificate is configured through protected GitHub Actions secrets. Without that setup, the installer is unsigned and SmartScreen may warn. Even a valid signature does not guarantee an immediate warning-free first release: reputation builds over time, and EV certificates no longer bypass SmartScreen. Microsoft identifies Microsoft Store distribution as the reliable way to avoid SmartScreen download warnings; that distribution path is not set up for this project yet. See [Microsoft's SmartScreen guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation).

@@ -54,15 +54,16 @@ class TestGUIIntegration(unittest.TestCase):
     def test_ch340_handshake_failure_has_actionable_firmware_guidance(self):
         message = MainWindow._actionable_operation_error(
             "Connect Programmer",
-            "COM4: no ProgramPic response after 10 seconds at 115200 baud.",
+            "COM4: no ProgramPic response after 10 seconds at 9600 baud.",
         )
         self.assertIn("Install Firmware", message)
-        self.assertIn("matching new/old bootloader", message)
+        self.assertIn("retries both standard Nano rates", message)
         self.assertIn("CH340/CH341", message)
-        self.assertIn("115200", message)
+        self.assertIn("9600", message)
 
     def test_main_window_initialization(self):
         self.assertEqual(self.win.settings.theme, "dark")
+        self.assertEqual(self.win.settings.baud, 9600)
         self.assertFalse(self.win.brand_icon.pixmap().isNull())
         self.assertFalse(self.win.log_dock.isVisible())
         toolbar = self.win.findChild(QToolBar, "mainToolbar")
@@ -285,6 +286,25 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertTrue(dlg_flash.flash_button.isEnabled())
         self.assertTrue(dlg_flash.board_note.isHidden())
         dlg_flash.close()
+
+    def test_preflight_checklist_wraps_text_and_requires_every_confirmation(self):
+        items = build_dynamic_preflight(lookup("pic16f84a"), "nano_new")
+        dialog = PreflightDialog(items, "Hardware preflight", "Check the physical setup", self.win)
+        self.assertFalse(dialog.continue_button.isEnabled())
+        self.assertEqual(len(dialog.check_labels), len(items))
+        self.assertTrue(all(label.wordWrap() for label in dialog.check_labels))
+        self.assertIn("0 of", dialog.check_summary.text())
+        dialog.show()
+        QApplication.processEvents()
+
+        QTest.mouseClick(dialog.check_labels[0], Qt.MouseButton.LeftButton)
+        self.assertTrue(dialog.checks[0].isChecked())
+        for checkbox in dialog.checks[1:]:
+            checkbox.setChecked(True)
+        self.assertTrue(dialog.continue_button.isEnabled())
+        dialog.checks[0].setChecked(False)
+        self.assertFalse(dialog.continue_button.isEnabled())
+        dialog.close()
 
     def test_dialogs_instantiation(self):
         dlg_flash = FlashArduinoDialog(self.win.settings, self.win.lane, self.win)
