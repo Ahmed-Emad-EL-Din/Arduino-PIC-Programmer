@@ -11,19 +11,22 @@ The prior Windows workflow passed, but it predates the new installer packaging; 
 
 ## 1. Hardware you need
 
-Follow the reference circuit (official Ho-Ro schematic):
-**[https://github.com/Ho-Ro/ArdPicProg/blob/master/ArdPicProg_1_8_horo.png](https://github.com/Ho-Ro/ArdPicProg/blob/master/ArdPicProg_1_8_horo.png)**
+The firmware uploaded by this app uses the following Arduino Nano wiring. The upstream Ho-Ro schematic and photographs below may show a different pinout and polarity; treat them as historical references only, not instructions for this firmware.
 
-* An Arduino (Uno / Nano / Pro Mini / Mega / Leonardo) + USB cable
-* The ArdPicProg shield (13 V VPP supply + ZIF socket + ICSP header)
-  — or the equivalent wiring:
-  * **D2 → VDD**, **D3 → MCLR/VPP**, **D4 → CLK**, **D5 → DATA**
-    (ProgramPic v1.8.horo pinout)
-  * The official shield's documented **16–20 V** VPP input (red LED = VPP OK). Do not substitute a 24 V source unless the exact hardware documentation permits it.
-* The target PIC (e.g. PIC16F84A) in the ZIF socket, pin 1 aligned,
-  lever locked
-* Jumper **JP3**: position 1-2 for 18-pin chips (PIC16F84A),
-  2-3 for 8-pin chips (PIC12F675)
+| Arduino Nano pin | Firmware signal | PIC16F84A connection | Function / notes |
+|---|---|---|---|
+| A1 | `PIN_MCLR` | Pin 4, MCLR/VPP, through the external VPP switching circuit | HIGH = reset / VPP off; LOW = select approximately 13 V VPP. A1 must only drive the low-voltage switch input—never connect the VPP rail directly to an Arduino pin. |
+| D2 | `PIN_VDD` | Pin 14, VDD | HIGH = target 5 V on; LOW = off. Fit 100 nF between PIC VDD and VSS near the device. |
+| D4 | `PIN_CLOCK` | Pin 12, RB6/PGC | ICSP clock. |
+| D7 | `PIN_DATA` | Pin 13, RB7/PGD | Bidirectional ICSP data. |
+| A5 | `PIN_ACTIVITY` | Activity LED anode through a current-limiting resistor; cathode to GND | Indicates serial-command and read/write activity. |
+| GND | Common ground | Pin 5, VSS | Join Arduino, PIC, and VPP/VDD circuit grounds. |
+
+Use an Arduino (Nano / Uno / Pro Mini / Mega / Leonardo) and a PIC target. The pin assignments above are the firmware profile; check the exact board pin aliases and PIC package datasheet before wiring. The VPP switching circuit—not A1 itself—must route the external programming voltage to MCLR/VPP. Keep the PIC's documented VPP input isolated from Arduino GPIO and verify supply polarity/voltage before attaching a device.
+
+The upstream Ho-Ro hardware reference is available [here](https://github.com/Ho-Ro/ArdPicProg/blob/master/ArdPicProg_1_8_horo.png), but its wiring may not match this custom firmware profile.
+
+For a PIC16F84A in the published ZIF shield, JP3 is commonly set to 1-2; an 8-pin PIC such as PIC12F675 may require JP3=2-3. Confirm the exact board schematic before selecting jumper positions.
 
 ## 2. First-time setup (once)
 

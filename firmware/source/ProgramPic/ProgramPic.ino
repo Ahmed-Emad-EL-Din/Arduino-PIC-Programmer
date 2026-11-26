@@ -16,6 +16,8 @@
 *
 *
 * Change log:
+* 2026:      - Project wiring profile: VDD=D2, MCLR/VPP switch=A1,
+*              CLOCK=D4, DATA=D7, activity LED=A5; active-low VPP select.
 * 19/02/21:  - HoRo: version 1.8.horo, changed pinning and polarity!
 *              VDD - D2, VPP - D3, CLOCK - D4, DATA - D5
 * 11/05/20:  - added support for PIC16F688
@@ -41,14 +43,16 @@
 // Program version
 const char s_Version[] = "1.8.horo";
 
-// Pin mappings for the PIC programming interface
-#define PIN_ACTIVITY LED_BUILTIN // LED that indicates read/write activity
-#define PIN_VDD      2           // 1: Power the PIC
-#define PIN_MCLR     3           // 0: reset PIC, 1: MCLR is VPP voltage
-#define PIN_CLOCK    4           // Clock pin
-#define PIN_DATA     5           // Data pin
-#define MCLR_RESET   LOW         // PIN_MCLR state to reset the PIC
-#define MCLR_VPP     HIGH        // PIN_MCLR state to apply 13v to MCLR/VPP pin
+// Arduino Nano / ATmega328P wiring profile for the PIC programming interface.
+// PIN_MCLR drives only the low-voltage control input of an external VPP switch;
+// never connect the approximately 13 V VPP rail directly to an Arduino pin.
+#define PIN_ACTIVITY A5          // Activity LED anode through a current-limiting resistor
+#define PIN_VDD      2           // Switched +5 V to target VDD (HIGH=on, LOW=off)
+#define PIN_MCLR     A1          // External MCLR/VPP switching circuit control
+#define PIN_CLOCK    4           // D4 -> PIC RB6/PGC (PIC16F84A pin 12)
+#define PIN_DATA     7           // D7 <-> PIC RB7/PGD (PIC16F84A pin 13)
+#define MCLR_RESET   HIGH        // HIGH selects reset / VPP off on the external circuit
+#define MCLR_VPP     LOW         // LOW selects approximately 13 V VPP via that circuit
 
 // All delays are in microseconds.
 #define DELAY_SETTLE 50 // Delay for lines to settle for reset
@@ -1120,8 +1124,8 @@ void processCommand(const char *buf) {
 void enterProgramMode() {
     // Bail out if already in programming mode.
     if (state != STATE_IDLE) return;
-    // Lower MCLR, VDD, DATA, and CLOCK initially. This will put the
-    // PIC into the powered-off, reset state just in case.
+    // Select reset/VPP-off on the external switch and remove target VDD.
+    // This leaves the PIC powered off and held in reset before entry.
     digitalWrite(PIN_MCLR, MCLR_RESET);
     digitalWrite(PIN_VDD, LOW);
     digitalWrite(PIN_DATA, LOW);
@@ -1132,7 +1136,7 @@ void enterProgramMode() {
     pinMode(PIN_DATA, OUTPUT);
     pinMode(PIN_CLOCK, OUTPUT);
     if (hpp_progEntryMode == MCLR_first) {
-        // Raise MCLR, then VDD.
+        // Select VPP on the external switch, then apply target VDD.
         digitalWrite(PIN_MCLR, MCLR_VPP);
         delayMicroseconds(DELAY_TPPDP);
         digitalWrite(PIN_VDD, HIGH);
@@ -1154,7 +1158,7 @@ void exitProgramMode() {
     // Nothing to do if already out of programming mode.
     if (state == STATE_IDLE)
         return;
-    // Lower MCLR, VDD, DATA, and CLOCK.
+    // Select reset/VPP-off on the external switch and remove target VDD.
     digitalWrite(PIN_MCLR, MCLR_RESET);
     digitalWrite(PIN_VDD, LOW);
     digitalWrite(PIN_DATA, LOW);

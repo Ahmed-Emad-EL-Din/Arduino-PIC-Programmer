@@ -889,23 +889,30 @@ class MainWindow(QMainWindow):
         bw = get_board_wiring(self.board_key)
         pw = get_pic_wiring(self.target.name)
 
+        pin_summary = (
+            f"Pins: {bw.vdd_pin}=VDD, {bw.mclr_pin}=MCLR/VPP switch, "
+            f"{bw.clk_pin}=CLK, {bw.data_pin}=DATA, {bw.activity_pin}=activity LED. "
+            "A1 is logic-only: HIGH=reset/VPP off; LOW selects external VPP."
+        )
         if self.board_key == "pro_mini_5v":
             self.lbl_board_note.setText(
-                "⚠ Use only the 5V / 16MHz Pro Mini. A 3.3V variant is not electrically compatible."
+                "⚠ Use only the 5V / 16MHz Pro Mini; 3.3V is not compatible. " + pin_summary
             )
             self.lbl_board_note.setObjectName("warn")
         elif bw.needs_reset_cap:
             self.lbl_board_note.setText(
-                f"Pins: {bw.vdd_pin}=VDD, {bw.mclr_pin}=MCLR, {bw.clk_pin}=CLK, "
-                f"{bw.data_pin}=DATA · Add 2.2 µF {bw.reset_pin}-GND cap after flashing."
+                pin_summary + f" Add 2.2 µF {bw.reset_pin}-GND cap after flashing."
             )
             self.lbl_board_note.setObjectName("muted")
         else:
             self.lbl_board_note.setText(
-                f"Pins: {bw.vdd_pin}=VDD, {bw.mclr_pin}=MCLR, {bw.clk_pin}=CLK, "
-                f"{bw.data_pin}=DATA · Native USB CDC (no 2.2 µF cap needed)."
+                pin_summary + " Native USB CDC (no 2.2 µF cap needed)."
             )
             self.lbl_board_note.setObjectName("muted")
+        self.lbl_board_note.setToolTip(
+            "Do not connect the ~13 V VPP rail directly to Arduino A1 or any Arduino pin. "
+            "A1 drives only the external VPP switching circuit."
+        )
         self.lbl_board_note.style().unpolish(self.lbl_board_note)
         self.lbl_board_note.style().polish(self.lbl_board_note)
 
