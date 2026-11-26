@@ -1034,8 +1034,9 @@ class MainWindow(QMainWindow):
             else "Connect to the selected Arduino and check its ProgramPic handshake."
         )
         self.btn_detect.setToolTip(
-            "Connect the programmer first." if not conn
-            else "Ask ProgramPic to report a model. Raw silicon ID and socket voltage are not exposed to this app."
+            "Connect first. This asks ProgramPic to report a model; raw silicon ID and socket voltage are not exposed."
+            if not conn else
+            "Ask ProgramPic to report a model. Raw silicon ID and socket voltage are not exposed to this app."
         )
         self.btn_erase.setToolTip(
             "Connect the programmer first." if not conn

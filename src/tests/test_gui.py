@@ -84,7 +84,8 @@ class TestGUIIntegration(unittest.TestCase):
             "does not verify target identity",
             self.win.circuit_panel.hex_summary_lbl.text(),
         )
-        self.assertIn("Blocked:", self.win.lbl_hex_guidance.text())
+        self.assertIn("Addresses fit", self.win.lbl_hex_guidance.text())
+        self.assertIn("does not verify target identity", self.win.lbl_hex_guidance.text())
         capture_window(self.win, "hex-inspector-dark.png")
 
     def test_out_of_range_hex_disables_program_when_connected(self):
