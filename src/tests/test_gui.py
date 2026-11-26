@@ -42,6 +42,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.win = MainWindow()
         self.win.resize(1380, 880)
         self.win.apply_theme("dark", self.win.settings.font_size)
+        self.win._toggle_log(False)
         self.win.show()
 
     def tearDown(self):
@@ -49,6 +50,8 @@ class TestGUIIntegration(unittest.TestCase):
 
     def test_main_window_initialization(self):
         self.assertEqual(self.win.settings.theme, "dark")
+        self.assertFalse(self.win.brand_icon.pixmap().isNull())
+        self.assertFalse(self.win.log_dock.isVisible())
         toolbar = self.win.findChild(QToolBar, "mainToolbar")
         self.assertIsNotNone(toolbar)
         toolbar_actions = [action.text() for action in toolbar.actions() if not action.isSeparator()]
@@ -61,7 +64,8 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertIsNotNone(self.win.cmb_mcu)
         self.assertIn("not measured", self.win.status_lbl.text())
         self.assertIn("Raw silicon ID", self.win.btn_detect.toolTip())
-        self.assertIn("Target selected:", self.win.chip_target.text())
+        self.assertEqual(self.win.btn_erase.toolTip(), "Connect the programmer first.")
+        self.assertIn("Target selected:", self.win.chip_target.toolTip())
         self.win.cmb_port.clear()
         self.win.cmb_port.addItem("No serial ports detected", "")
         self.win._refresh_actions()
@@ -69,6 +73,28 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertIn("No serial port found", self.win.lbl_connection_guidance.text())
         self.assertFalse(self.win.target_tools_panel.isVisible())
         capture_window(self.win, "main-dark-no-hardware.png")
+
+    def test_compact_window_keeps_status_and_workbench_visible(self):
+        self.win.resize(1000, 620)
+        QApplication.processEvents()
+        self.assertEqual(self.win.minimumSize().width(), 1000)
+        for chip in (
+            self.win.chip_board, self.win.chip_prog,
+            self.win.chip_target, self.win.chip_file,
+        ):
+            self.assertTrue(chip.text())
+            self.assertTrue(chip.toolTip())
+        self.assertTrue(self.win.circuit_panel.isVisible())
+        capture_window(self.win, "main-compact-no-hardware.png")
+
+    def test_activity_log_close_button_persists_hidden_state(self):
+        self.win._toggle_log(True)
+        QApplication.processEvents()
+        self.assertTrue(self.win.act_log.isChecked())
+        self.win.log_dock.hide()
+        QApplication.processEvents()
+        self.assertFalse(self.win.act_log.isChecked())
+        self.assertFalse(self.win.settings.log_visible)
 
     def test_busy_serial_port_error_has_recovery_steps(self):
         message = MainWindow._actionable_operation_error(

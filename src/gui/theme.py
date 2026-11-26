@@ -42,6 +42,7 @@ def build_qss(t: ThemeTokens, font_size: int = 10) -> str:
     QFrame#headerBar, QFrame#sectionCard, QFrame#calloutCard, QFrame#referenceCard {{ background-color: {t.surface}; border: 1px solid {t.border}; border-radius: 8px; }}
     QFrame#sectionCard {{ padding: 4px; }}
     QFrame#subCard {{ background-color: {t.raised}; border: 1px solid {t.border}; border-radius: 6px; }}
+    QLabel#brandIcon {{ background: transparent; border: 0; }}
     QLabel#appTitle {{ font-size: {font_size + 5}pt; font-weight: 700; }}
     QLabel#cardTitle {{ font-size: {font_size + 1}pt; font-weight: 650; }}
     QLabel#muted, QLabel#subtext {{ color: {t.subtext}; }}
