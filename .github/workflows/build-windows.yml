@@ -86,6 +86,8 @@ jobs:
           Compress-Archive -Path 'dist/Arduino-PIC-Programmer/*' -DestinationPath $Zip -Force
           $Hash = (Get-FileHash -Path $Zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$Hash  Arduino-PIC-Programmer-Windows-x64.zip" | Set-Content -Path "$Zip.sha256" -Encoding ascii
+          $WrittenHash = ((Get-Content -Path "$Zip.sha256" -Raw).Trim() -split ' +')[0]
+          if ($WrittenHash -ne $Hash) { throw 'Generated SHA-256 sidecar does not match the candidate ZIP.' }
 
       - name: Upload candidate build artifact
         uses: actions/upload-artifact@v7
