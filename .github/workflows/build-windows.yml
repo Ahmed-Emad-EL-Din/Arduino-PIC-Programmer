@@ -347,6 +347,8 @@ jobs:
           if ($ZipExitCode -ne 0) {
             $Details = ($ZipOutput | Out-String).Trim()
             if ([string]::IsNullOrWhiteSpace($Details)) { $Details = 'Python returned a non-zero exit code without diagnostic output.' }
+            if ($Details.Length -gt 3000) { $Details = $Details.Substring(0, 3000) }
+            Write-Output "::error title=Portable ZIP builder diagnostics::$Details"
             throw "Compact portable ZIP creation/validation failed (exit code $ZipExitCode): $Details"
           }
           $ZipHash = (Get-FileHash -Path $Zip -Algorithm SHA256).Hash.ToLowerInvariant()
