@@ -345,7 +345,7 @@ jobs:
           $ZipExitCode = $LASTEXITCODE
           $ZipOutput | ForEach-Object { Write-Output $_ }
           if ($ZipExitCode -ne 0) {
-            $Details = ($ZipOutput | Out-String).Trim()
+            $Details = (($ZipOutput | Out-String) -replace '\s+', ' ').Trim()
             if ([string]::IsNullOrWhiteSpace($Details)) { $Details = 'Python returned a non-zero exit code without diagnostic output.' }
             if ($Details.Length -gt 3000) { $Details = $Details.Substring(0, 3000) }
             Write-Output "::error title=Portable ZIP builder diagnostics::$Details"
