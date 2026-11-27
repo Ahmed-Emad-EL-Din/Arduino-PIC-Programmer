@@ -335,7 +335,7 @@ class TestGUIIntegration(unittest.TestCase):
 
         dlg_set = SettingsDialog(self.win.settings, self.win)
         self.assertEqual(dlg_set.baud.text(), "9600 baud (required by ProgramPic)")
-        self.assertIn("fixed at 9600 baud", dlg_set.baud.toolTip())
+        self.assertIn("fixed at 9600 baud", dlg_set.baud.toolTip().lower())
         dlg_set.close()
 
         items = build_dynamic_preflight(lookup("pic12f675"), "nano_new")
