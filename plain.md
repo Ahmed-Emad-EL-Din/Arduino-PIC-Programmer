@@ -22,37 +22,35 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 
 Local results: `PYTHONPATH=.:src .venv/bin/pytest -q src/tests --ignore=src/tests/test_gui.py` passed (42 tests, 29 subtests); `compileall`, workflow YAML parsing, and `git diff --check` passed. Windows run `46047111968` passed the full GUI suite, all `winapp ui` accessible-control searches, package validation, installer smoke test, and checksum/ZIP creation. Earlier runs exposed stale GUI assertions and a PATH precedence issue; both were fixed before this passing run.
 
-## Current follow-up — simplify the workbench and display the circuit source
+## Current follow-up — use the supplied Drive circuit image
 
-### Phase 1 — Reduce top-level clutter
-- [x] Remove the duplicate quick-action toolbar; keep the existing menus and task-card actions.
-- [x] Keep only programmer connection and PIC target status chips; board and HEX state remain in their task cards.
-- [x] Replace the multiple wiring/pinout/HEX tabs with a single Circuit Reference view.
+### Phase 1 — Image integration
+- [x] Download and inspect the provided PNG (3570 × 2978; 1,220,742 bytes).
+- [x] Display the supplied PNG directly in the Circuit Reference view with zoom/fit controls; keep the firmware connection table below it as a separate reference.
+- [x] Preserve the warning that the unverified drawing depicts a 24 V supply/LM317 regulator and may not match the firmware map or safe VPP requirements.
 
-### Phase 2 — Put the reference and selected wiring together
-- [x] Render `assets/reference/user-circuit-diagram.drawio` offline as an SVG image inside the app, including embedded artwork, labels, and connection lines.
-- [x] Add zoom/fit controls and an Open Editable Source action; keep the unverified-source/VPP safety warning visible.
-- [x] Place the board/PIC-specific firmware connection table directly below the image and explicitly distinguish it from the user-supplied drawing.
+### Phase 2 — Packaging and docs
+- [x] Bundle the PNG in the Windows package and update the package validation list.
+- [x] Update README and user guide to identify the supplied image rather than the XML source.
+- [x] Remove the unused XML/SVG renderer and diagram source asset.
 
-### Phase 3 — Regression checks and documentation
-- [x] Add XML-to-SVG renderer tests, update GUI assertions for the one-view/compact-header layout, and add UI Automation searches for the view and connection table.
-- [x] Update README and user-guide wording for the inline circuit display and contextual connection table.
-- [x] Run 18 available pure-Python unit tests, `compileall`, and `git diff --check` successfully.
-- [ ] Run the PySide6 GUI suite and Windows packaged-app smoke/UI Automation checks; the current local environment has no PySide6 installation.
+### Phase 3 — Verification
+- [x] Run 18 available pure-Python unit tests; run `compileall`, package-spec syntax/image-path checks, stale-reference checks, and `git diff --check`.
+- [ ] Run the PySide6 GUI suite and Windows packaged-app checks; unavailable locally because PySide6 is not installed. Pytest and YAML parsers are also absent in this environment.
 
-## Current follow-up — refresh the app icon from the supplied Drive artwork
+## Current follow-up — crop the supplied Drive image for the app icon
 
-### Phase 1 — Icon adaptation
-- [x] Inspect the supplied Drive image and simplify it into a text-free, square icon with transparent outside corners and stronger small-size contrast.
-- [x] Preserve the Arduino loop and PIC-chip identity in the selected icon design.
+### Phase 1 — Source image and crop
+- [x] Download and inspect the exact Drive PNG; trim its transparent canvas to the rounded-square artwork without redrawing or changing the design.
+- [x] Square-fit the crop while preserving transparency at the rounded corners.
 
 ### Phase 2 — App asset integration
-- [x] Replace the app PNG, SVG source, and multi-resolution Windows ICO at `assets/app-icon.*` so the desktop app, installer, and executable use the refreshed icon.
-- [x] Keep the existing app/package references to `assets/app-icon.ico` intact.
+- [x] Regenerate `assets/app-icon.png`, its exact-image SVG wrapper, and the multi-resolution Windows ICO from the cropped artwork.
+- [x] Preserve existing app/package references to `assets/app-icon.ico`.
 
-### Phase 3 — Delivery and checks
-- [x] Upload the refined PNG as a separate Google Drive file, leaving the original Drive image unchanged.
-- [x] Validate the SVG XML and ICO/PNG dimensions/alpha; inspect the 16px and 48px ICO renderings.
+### Phase 3 — Validation
+- [x] Validate embedded SVG/ICO/PNG agreement and 256/128/64/48/32/16 ICO sizes; pass 20 available unit tests, `compileall`, and `git diff --check`.
+- [ ] Run GUI and Windows packaged-app checks; PySide6/pytest are not installed in this environment.
 
 ## Goal and release definition
 

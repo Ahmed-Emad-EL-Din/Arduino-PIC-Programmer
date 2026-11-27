@@ -67,7 +67,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertIsNone(self.win.findChild(QToolBar, "mainToolbar"))
         self.assertEqual(self.win.circuit_panel.tabs.count(), 1)
         self.assertEqual(self.win.circuit_panel.tabs.tabText(0), "Circuit Reference")
-        self.assertTrue(self.win.circuit_panel.reference_view._renderer.isValid())
+        self.assertFalse(self.win.circuit_panel.reference_view.image.isNull())
         self.assertFalse(self.win.progress.isVisible())
         self.assertFalse(self.win.btn_cancel.isVisible())
         self.assertIsNotNone(self.win.circuit_panel)
@@ -132,7 +132,7 @@ class TestGUIIntegration(unittest.TestCase):
         panel = self.win.circuit_panel
         self.assertEqual(panel.tabs.count(), 1)
         self.assertEqual(panel.tabs.tabText(0), "Circuit Reference")
-        self.assertTrue(panel.reference_view._renderer.isValid())
+        self.assertFalse(panel.reference_view.image.isNull())
         self.assertGreater(panel.wiring_table.rowCount(), 0)
         self.assertEqual(panel.wiring_table.accessibleName(), "Point-to-point hardware connections")
         panel.reference_view.zoom_in()
@@ -321,7 +321,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.win.settings.theme = "high_contrast"
         self.win.apply_theme("high_contrast", self.win.settings.font_size)
         self.assertEqual(self.win.circuit_panel._theme, "high_contrast")
-        self.assertTrue(self.win.circuit_panel.reference_view._renderer.isValid())
+        self.assertFalse(self.win.circuit_panel.reference_view.image.isNull())
         capture_window(self.win, "main-high-contrast-no-hardware.png")
 
         self.win.settings.theme = "dark"
@@ -342,15 +342,20 @@ class TestGUIIntegration(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertEqual(widget.accessibleName(), name)
 
-    def test_circuit_reference_source_renders_as_an_image(self):
+    def test_circuit_reference_uses_the_supplied_png(self):
         dev = lookup("pic16f84a")
         self.win.cmb_board.setCurrentIndex(self.win.cmb_board.findData("uno"))
         self.win.cmb_mcu.setCurrentIndex(self.win.cmb_mcu.findData(dev.name))
         self.win._sync_inspector()
-        svg = self.win.circuit_panel.reference_view.svg_bytes
-        self.assertTrue(svg.startswith(b"<svg"))
-        self.assertIn(b"<image", svg)
-        self.assertTrue(self.win.circuit_panel.reference_view._renderer.isValid())
+        reference = self.win.circuit_panel.reference_view
+        image_bytes = reference.image_bytes
+        self.assertTrue(image_bytes.startswith(b"\x89PNG\r\n\x1a\n"))
+        self.assertEqual(reference.image.width(), 3570)
+        self.assertEqual(
+            image_bytes,
+            (Path(__file__).resolve().parents[2] / "assets" / "reference" / "circuit-reference.png").read_bytes(),
+        )
+        self.assertFalse(reference.image.isNull())
         self.assertIn("unverified", self.win.circuit_panel.reference_notice.text().lower())
 
 if __name__ == "__main__":

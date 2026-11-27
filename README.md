@@ -1,158 +1,88 @@
 # Arduino-PIC Programmer
 
-## Windows build status
+A Windows desktop workbench for an Arduino-based PIC programmer using the bundled ProgramPic firmware and ArdPicProg host. Load and inspect Intel HEX files, connect to the programmer, select a supported PIC, and run guarded read, erase, program, and verify operations from one Qt application.
 
-**Recommended: install the app.** Download the Windows x64 installer from the [GitHub Releases page](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases). Each published release provides the setup executable and SHA-256 sidecar, plus an installer-only ZIP and its sidecar. Verify the setup executable before installing:
+> **Hardware caution:** This project has not completed physical hardware acceptance. A successful build or Windows installer test does not verify electrical safety, target compatibility, VPP voltage, or programming reliability. Treat releases as software candidates; independently validate the exact programmer, target package, datasheet, and wiring before connecting hardware. Do not perform destructive programming based only on the app's checks or the reference drawing.
+
+## Download for Windows
+
+**Latest Windows x64 installer:** [GitHub Releases](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases/latest)
+
+Download `Arduino-PIC-Programmer-Setup-x64.exe` and its `.sha256` sidecar. Verify the checksum before running Setup:
 
 ```powershell
-$setup = 'Arduino-PIC-Programmer-Setup-x64.exe'
-$expected = ((Get-Content ($setup + '.sha256') -Raw).Trim() -split ' +')[0].ToLowerInvariant()
+$setup = '.\Arduino-PIC-Programmer-Setup-x64.exe'
+$sidecar = Get-Content ($setup + '.sha256') -Raw
+$expected = ($sidecar.Trim() -split '\s+')[0].ToLowerInvariant()
 $actual = (Get-FileHash -Path $setup -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actual -ne $expected) { throw 'SHA-256 mismatch; do not install this file.' }
 ```
 
-Run Setup for a normal per-user installation—no administrator rights required. It creates a Start menu shortcut, registers the app with Windows Installed Apps/Apps & Features, provides an uninstaller, and can create an optional desktop shortcut. It uses the app's branded icon. The separate optional **Arduino-PIC-Programmer-Installer-Windows-x64** ZIP is deliberately installer-only: when opened, it contains the Setup executable and no loose runtime files. The `.sha256` checksum is supplied beside the ZIP as a separate artifact file.
+Setup is a per-user installation and does not require administrator rights. It adds a Start menu shortcut, appears in Windows Installed Apps, and includes an uninstaller; a desktop shortcut is optional. The separate `Arduino-PIC-Programmer-Installer-Windows-x64.zip` contains the installer only—it is **not** a portable application. Extract it and run Setup. Each download has a separate SHA-256 sidecar.
 
-GitHub Actions artifacts remain temporary (14-day retention); tagged Windows builds publish the installer and installer-only ZIP as downloadable GitHub Release assets. The installer ZIP is not a portable app; run its setup executable to install normally.
+Tagged Windows builds run the test suite, compile the firmware, build the app, validate the package, and smoke-test installation, launch, and uninstall. These are software/CI checks, not physical-device tests. Installers may be unsigned if no trusted Authenticode certificate is configured, so Microsoft Defender SmartScreen may show a publisher or reputation warning. Do not bypass a warning without verifying the source and checksum.
 
-ProgramPic uses 115200 baud for its app link; Nano uploads try 115200 first, then 57600. Use **Install Firmware…** to update the sketch.
+## What it does
 
-### Why Windows may show “Windows protected your PC”
+- Manages the Arduino serial connection and bundled ProgramPic firmware; Nano uploads try 115200 baud first and then 57600 baud.
+- Opens, inspects, and exports Intel HEX data, with target-memory checks and read-back verification.
+- Supports guarded connect, detect, program, erase, read, and verify workflows, with a preflight checklist and confirmation for destructive operations.
+- Provides a board/PIC connection table, HEX memory inspector, activity log, themes, and editable firmware source.
+- Displays the supplied circuit image in the **Circuit Reference** view. Its board/PIC firmware table is separate from the drawing and is not an electrical validation of it.
 
-That dialog is Microsoft Defender SmartScreen's **publisher/file-reputation** warning. It commonly appears for a new, unsigned download; it is not by itself a malware detection. Packaging the EXE inside an installer or ZIP does not remove the warning. This workflow signs app binaries and the installer only for version-tag builds when a trusted Authenticode certificate is configured through protected GitHub Actions secrets. Without that setup, the installer is unsigned and SmartScreen may warn. Even a valid signature does not guarantee an immediate warning-free first release: reputation builds over time, and EV certificates no longer bypass SmartScreen. Microsoft identifies Microsoft Store distribution as the reliable way to avoid SmartScreen download warnings; that distribution path is not set up for this project yet. See [Microsoft's SmartScreen guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation).
+See the [User Guide](docs/USER_GUIDE.md) for the application workflow and board-specific notes.
 
-Do not disable SmartScreen or bypass its warning for an unvalidated candidate. Verify the source and SHA-256; wait for a signed, hardware-validated release before installing it for programming work.
+## Hardware, wiring, and VPP safety
 
-**Not yet a validated hardware release:** Windows CI smoke-tests installation, launch, and uninstall without hardware. That does not replace testing on a clean Windows PC or physical programmer hardware. Do not use an unvalidated candidate for destructive programming. The [Releases page](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases) does not yet contain a validated downloadable release.
+Use only a programmer circuit and supply that are documented for your exact hardware revision. Confirm every connection against the board documentation and the target PIC datasheet before applying power.
 
-**Made By:** Ahmed Emad El-Din Hussein · [https://github.com/Ahmed-Emad-EL-Din](https://github.com/Ahmed-Emad-EL-Din)
+The bundled Nano firmware profile uses D2 for switched target VDD, A1 as a **low-voltage VPP-switch control**, D4 for PGC/clock, D7 for bidirectional PGD/data, and A5 for the activity LED. A1 does not generate or tolerate programming voltage: **never connect VPP directly to A1 or any Arduino GPIO**. The external switching circuit must route VPP to MCLR/VPP. Join grounds as required by the verified hardware and place the target's required decoupling capacitor (typically 100 nF) between VDD and VSS.
 
----
+The [user-supplied circuit image](assets/reference/circuit-reference.png) is an **unverified reference**, not a validated schematic or wiring instruction. It depicts a 24 V DC input and an LM317 regulator; it may not match the firmware pin map or the actual programmer. The project guide describes a 16–20 V input for the official shield—do not apply the image's 24 V input to that shield unless its own documentation explicitly permits it. Do not wire or power hardware from the image or app connection table alone. Verify the specific VPP circuit, voltage, polarity, and target limits independently.
 
-## 1. Hardware connections and VPP supply reference
+The application does not measure socket voltage. The upstream host does not expose raw silicon ID/configuration values to the UI, and a manual selection cannot electronically identify devices that have no silicon ID. A green connection state or successful software check is not proof that the target wiring or voltage is safe.
 
-### Required hardware
-- **Arduino:** Uno, Nano, Mega, Leonardo/Micro, or 5 V / 16 MHz Pro Mini. The 3.3 V Pro Mini is not electrically compatible.
-- **Target PIC:** one of the supported devices; confirm its exact package and pinout in the device datasheet.
-- **Programmer interface:** the bundled firmware uses this Arduino Nano pin map: D2=switched target VDD, A1=external MCLR/VPP switch control, D4=PGC/clock, D7=bidirectional PGD/data, and A5=activity LED. A1 is a low-voltage logic control only: HIGH selects reset/VPP-off; LOW selects the external ~13 V VPP switch. Never connect VPP directly to A1 or another Arduino pin. Join Arduino GND, PIC VSS, and the VPP/VDD circuit ground; place 100 nF between PIC VDD and VSS. Some boards need the reset capacitor noted in the board-specific wiring reference.
-- **VPP supply:** use the supply specified by the exact programmer hardware. The LM317 drawing below is a calculation/reference circuit, not a validated substitute for the official ArdPicProg shield. The user guide's official shield reference calls for a 16–20 V input; do not apply 24 V to that shield unless its documentation explicitly permits it.
+## Quick start
 
-### User-supplied circuit diagram
+1. Install the Windows x64 app from the [latest release](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases/latest) and verify its SHA-256 sidecar.
+2. Connect a supported Arduino board by USB. Select its board type and serial port.
+3. Use **Programmer → Install/Update ProgramPic Firmware…** to install the bundled firmware when appropriate. Leonardo/Micro firmware upload from this app is unsupported; use Arduino IDE for those boards.
+4. Select the exact PIC model and load its `.hex` file. Check the package, pinout, supply, and VPP circuit against their documentation.
+5. Connect to the programmer, run the available detection/checks, and complete the on-screen preflight. Review the exact operation before confirming. Back up data first when possible.
 
-The app renders the supplied editable [diagrams.net source](assets/reference/user-circuit-diagram.drawio) as an image in its single **Circuit Reference** view, with the selected board/PIC connection table directly below it. The drawing is unverified: it includes a 24 V supply/regulator and may not match the firmware pin map or safe VPP requirements. The table is a separate firmware connection map—not proof that the drawing is compatible. Do not wire or power hardware from either source alone; check the exact target datasheet and hardware documentation, and independently verify the VPP circuit. The app's offline renderer displays embedded diagram content without requiring diagrams.net or a network connection.
+For detailed operating instructions, safety notes, and target-specific guidance, read the [User Guide](docs/USER_GUIDE.md). The app's preflight and confirmations are safeguards, not substitutes for hardware validation.
 
-### Wiring notes for supported PIC packages
-The desktop inspector shows the user-supplied circuit image and a separate firmware connection table; neither replaces the exact device datasheet. Unverified pin mappings are flagged, and the table does not certify the drawing.
+## Supported boards and PIC targets
 
-**A. ZIF-18 Direct Mode (8-pin & 18-pin PICs)**
-*   **PIC16F84A (18-pin):** JP3 = `1-2`. Pins: VDD=14, VSS=5, MCLR=4(RA5), PGC=12(RB6), PGD=13(RB7), PGM=10(RB4).
-*   **PIC12F675 (8-pin):** JP3 = `2-3`. Pins: VDD=1, VSS=8, MCLR=4(GP3), PGC=6(GP1), PGD=7(GP0).
+The firmware profiles include Arduino Uno, Nano (new and old bootloader), 5 V / 16 MHz Pro Mini, Mega 2560, Leonardo, and Micro. The 3.3 V Pro Mini is not electrically compatible with this profile. Firmware upload through the app is unsupported for Leonardo/Micro; use Arduino IDE for those boards.
 
-**B. ICSP Cable / Adapter Mode (14/20/28/40-pin PICs)**
-*   **PIC16F877A (40-pin):** ICSP Header. Pins: VDD=11&32, VSS=12&31, MCLR=1, PGC=39(RB6), PGD=40(RB7), PGM=36(RB3).
+The current device database includes 25 PIC targets:
 
-The HEX memory-map inspector is an application feature; no screenshot is included in this repository snapshot.
+`PIC12F629`, `PIC12F675`, `PIC12F683`, `PIC16F630`, `PIC16F676`, `PIC16F84`, `PIC16F84A`, `PIC16F87`, `PIC16F88`, `PIC16F627`, `PIC16F627A`, `PIC16F628`, `PIC16F628A`, `PIC16F648A`, `PIC16F684`, `PIC16F688`, `PIC16F690`, `PIC16F872`, `PIC16F877`, `PIC16F877A`, `PIC16F882`, `PIC16F883`, `PIC16F884`, `PIC16F886`, and `PIC16F887`.
 
----
+Confirm the exact part number, package, pinout, memory regions, and programmer support before using a target. Similar device names do not guarantee interchangeable wiring or programming requirements.
 
-## 2. Step-by-Step Usage
+## Build and test from source
 
-### Step 1 — Flash Arduino Firmware (Once)
-1. Launch **Arduino-PIC-Programmer.exe**.
-2. Open **Programmer → Install/Update ProgramPic Firmware…**.
-3. Select the board and COM port; press **Flash Firmware**.
-4. Confirm success only after the upload finishes.
+The desktop application uses Python 3.11+, PySide6, and pyserial. In a virtual environment:
 
-Use **Programmer → Edit ProgramPic Source…** to edit, reset, or export the sketch. The installer flashes its bundled build; upload custom edits from Arduino IDE.
-
-> Windows installers are published on the Releases page after a successful tagged build. Leonardo/Micro firmware upload in this app is unsupported; use Arduino IDE for those boards.
-
-### Step 2 — Connect & Verify
-1. Connect the Arduino by USB. Only connect an external VPP supply that matches the exact programmer hardware; the reference LM317 circuit above is not hardware-validated.
-2. Select Board and COM Port in the app.
-3. Press **Connect Programmer** (`Ctrl+P`).
-4. Status chip turns **Green (Programmer: ✓ vX)** — Handshake passed.
-
-### Step 3 — Load HEX & Select MCU
-1. **Open HEX…** (`Ctrl+O`) or drag-and-drop `.hex` file.
-2. Pick Target MCU (e.g., **PIC16F84A**) from dropdown.
-3. **Detect Chip** (`F6`) — asks the ProgramPic host to identify a supported device. The raw ID/config values are not exposed by the upstream CLI; every destructive operation re-asks the host to validate the selected device.
-
-### Step 4 — Preflight & Programming
-1. **Preflight Checklist** appears (VPP LED, Socket, Jumper, Voltage). Tick all items.
-2. **Confirmation Dialog** shows exact operation (Erase → Write → Verify → Safe State).
-3. Press **Program & Verify** (`Ctrl+R`).
-4. The Activity Log shows the upstream host's erase/write/read output, followed by a read-back comparison for every supplied address. The host closes its serial port on exit and sends its documented `PWROFF` command.
-5. A success message appears only if the host operation and configured read-back verification pass.
-
-### Step 5 — Other Operations
-*   **Erase Only…** — bulk erase with calibration preservation.
-*   **Verify vs File** — read chip and compare against loaded HEX.
-*   **Read Chip → Save HEX…** (`Ctrl+S`) — backup chip to Intel HEX.
-*   **Device Info** — port, firmware version, selected target, package and memory sizes. The upstream CLI does not expose raw ID/config values to this window.
-
----
-
-## 3. Safety Interlocks (intended behavior)
-
-The source implements these gates, but it has not yet been validated on physical programmer hardware. Always confirm the exact MCU datasheet, wiring, and VPP supply independently; do not use an untested build for destructive operations.
-| Gate | Behaviour |
-|---|---|
-| Programmer verified | Handshake required before any command |
-| Device selection | Host detection is requested, but raw silicon ID/config values are not exposed to the GUI; do not treat a displayed model as a measured ID |
-| Empty socket / no VPP | Host detection errors may be surfaced; physical empty-socket/VPP failure behavior is not hardware-validated |
-| No-ID chips (PIC16F84) | Manual target-selection warning; electronic identity cannot distinguish devices with no silicon ID |
-| HEX fit check | HEX must only touch existing regions |
-| Preflight checklist | VPP LED, socket, jumper, voltage — all items ticked |
-| Confirmations | Erase/program dialogs spell out exact actions |
-| Verify after write | ON by default; extra confirmation to disable |
-| Safe state | Upstream host sends its documented `PWROFF` during normal shutdown; abnormal process termination and physical safe-state behavior still need hardware validation |
-| Firmware safety net | Upstream firmware documents an inactivity power-off; this behavior has not been validated in this application's hardware acceptance tests |
-
----
-
-## 4. Supported Targets (25 MCUs)
-`PIC16F84A` (default), PIC16F84, PIC16F627/A, PIC16F628/A, PIC16F648A,
-PIC16F630, PIC16F676, PIC16F684, PIC16F688, PIC16F690, PIC16F87, PIC16F88,
-PIC16F872, PIC16F877/A, PIC16F882–887, PIC12F629, PIC12F675, PIC12F683.
-
----
-
-## 5. Requirements
-* **Windows 10/11:** the installer is published on the GitHub Releases page. It remains a software candidate until physical hardware acceptance is complete.
-* **Arduino Board** + **LM317 13V Circuit** + **ZIF/ICSP Shield** for hardware use.
-* **24V DC Supply** (as used in the circuit image above; verify your exact circuit design).
-* Firmware source is in `firmware/source/`; Windows build scripts compile board-specific firmware and stage `avrdude` for the portable package.
-* The Windows installer is published as a software candidate; physical hardware acceptance is still required before it can be described as validated.
-
----
-
-## 6. Project Layout
-```
-├── app/                      # application identity and persistent settings
-├── src/main.py               # desktop entry point
-├── src/core/                 # HEX, safety, wiring, serial-host adapter
-├── src/gui/                  # Qt workbench, dialogs, workers, inspectors
-├── src/tests/                # integration and core regression tests
-├── firmware/source/          # upstream ProgramPic Arduino sketch
-├── vendor/ArdPicProg/        # upstream GPL-3.0 host implementation
-├── packaging/                # PyInstaller and Windows build scripts
-├── .github/workflows/        # Windows candidate-package workflow
-└── docs/                     # user guide and hardware notes
+```powershell
+python -m pip install -r requirements.txt
+$env:PYTHONPATH = 'src;.'
+python -m pytest -q
 ```
 
-The Windows candidate workflow has passed. A downloadable installer candidate is published on the Releases page; clean-machine and physical-device acceptance tests remain outstanding.
+The Windows release workflow performs the full Windows GUI, package, and installer checks. Its CI results do not replace testing on the exact hardware. Build scripts and packaging configuration are in `packaging/`; the bundled Arduino sketch is in `firmware/source/`.
 
----
+## Project and licensing
 
-## 7. Credits & License
-* **Author:** Ahmed Emad El-Din Hussein · [https://github.com/Ahmed-Emad-EL-Din](https://github.com/Ahmed-Emad-EL-Din)
-* **Firmware and host protocol:** ProgramPic v1.8.horo / ArdPicProg (Ho-Ro / Southern Storm Software), GPL-3.0; see [`LICENSE`](LICENSE) and `vendor/ArdPicProg/UPSTREAM.md`.
-* **Python GUI:** project source in this repository; see `LICENSE` for distribution terms.
+- `src/` — desktop app, programmer protocol, safety checks, HEX handling, and tests.
+- `firmware/` — ProgramPic Arduino source and precompiled board images.
+- `assets/` — application icons and the supplied circuit-reference image.
+- `packaging/` — Windows build and installer configuration.
+- `docs/USER_GUIDE.md` — user-facing operating and hardware notes.
+- `vendor/ArdPicProg/` — upstream host implementation and attribution.
 
----
+See [`LICENSE`](LICENSE), [`LGPL-3.0.txt`](LGPL-3.0.txt), and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for project and third-party license information.
 
-## 8. Disclaimer
-High-voltage (≈13 V) programming circuitry is involved. The author assumes
-no responsibility for damaged chips, boards, or injury. Always verify
-wiring, VPP supply, and device selection before programming.
+**Author:** Ahmed Emad El-Din Hussein · [GitHub](https://github.com/Ahmed-Emad-EL-Din)
