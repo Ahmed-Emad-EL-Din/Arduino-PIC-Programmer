@@ -10,6 +10,8 @@ from .pinout_db import get_board_wiring, get_pic_wiring
 def _palette(theme: str):
     if theme == "light":
         return {"bg": "#f5f7fb", "panel": "#ffffff", "ink": "#182230", "muted": "#526174", "wire": "#087e8b", "warn": "#b42318", "border": "#aeb8c5"}
+    if theme == "high_contrast":
+        return {"bg": "#000000", "panel": "#000000", "ink": "#ffffff", "muted": "#ffffff", "wire": "#00ffff", "warn": "#ffff00", "border": "#ffffff"}
     return {"bg": "#101722", "panel": "#182231", "ink": "#edf3fa", "muted": "#a8b7c8", "wire": "#51d6c5", "warn": "#ff8a80", "border": "#46566b"}
 
 

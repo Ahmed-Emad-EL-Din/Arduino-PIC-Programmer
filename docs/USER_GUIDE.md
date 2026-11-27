@@ -73,7 +73,7 @@ The app must not be considered production-ready until Windows and physical-devic
   Connect/Disconnect (`Ctrl+P`), Detect Chip (`F6`), Device Info,
   Erase…, Program… (`Ctrl+R`), Verify, Read
 * **Settings** — Connection (port/baud/board/MCU), Appearance
-  (dark/light, font size), Safety (confirmations, auto-verify)
+  (dark/light/high contrast, font size), Safety (confirmations, auto-verify)
 * **View** — Show Log (`Ctrl+L`), Zoom In/Out (`Ctrl +/-`), Reset,
   Toggle Theme (`Ctrl+T`)
 * **Help** — User Guide, Wiring Diagram, ProgramPic Firmware Help,

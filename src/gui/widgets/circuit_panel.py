@@ -228,6 +228,7 @@ class CircuitPanel(QWidget):
         # --- Main Inspector Tabs ---
         self.tabs = QTabWidget()
         self.tabs.setObjectName("inspectorTabs")
+        self.tabs.setAccessibleName("Programmer reference and data views")
         root.addWidget(self.tabs, 1)
 
         # Tab 1: Illustrative wiring overview
@@ -280,6 +281,10 @@ class CircuitPanel(QWidget):
         lay.addLayout(bar)
 
         self.schem_view = ZoomableSvgView()
+        self.schem_view.setAccessibleName("Illustrative wiring overview")
+        self.schem_view.setAccessibleDescription(
+            "Illustration only; verify each connection against the exact board and PIC datasheets."
+        )
         lay.addWidget(self.schem_view, 1)
 
         self.safety_foot = QLabel()
@@ -296,6 +301,7 @@ class CircuitPanel(QWidget):
         lay.setSpacing(8)
 
         self.pinout_view = ZoomableSvgView()
+        self.pinout_view.setAccessibleName("PIC package pinout illustration")
         self.pinout_view.setMinimumHeight(230)
         lay.addWidget(self.pinout_view, 3)
 
@@ -305,6 +311,7 @@ class CircuitPanel(QWidget):
 
         self.wiring_table = QTableWidget(0, 4)
         self.wiring_table.setObjectName("wiringTable")
+        self.wiring_table.setAccessibleName("Point-to-point hardware connections")
         self.wiring_table.setHorizontalHeaderLabels(
             ["Signal", "Arduino / Shield Source", "Target PIC Pin(s)", "Hardware Notes"]
         )
@@ -371,6 +378,7 @@ class CircuitPanel(QWidget):
 
         # Monospace 14-bit word inspector
         self.hex_dump = QPlainTextEdit()
+        self.hex_dump.setAccessibleName("HEX word memory map")
         self.hex_dump.setReadOnly(True)
         self.hex_dump.setObjectName("log")
         f = QFont("DejaVu Sans Mono")
@@ -401,6 +409,7 @@ class CircuitPanel(QWidget):
         ref_dir = _assets_reference_dir()
         source_file = ref_dir / "user-circuit-diagram.drawio"
         open_source = QPushButton("Open supplied circuit source")
+        open_source.setAccessibleName("Open supplied editable circuit source")
         open_source.setToolTip("Open the editable diagrams.net source")
         open_source.setEnabled(source_file.is_file())
         open_source.clicked.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(source_file))))

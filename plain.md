@@ -2,6 +2,26 @@
 
 This is the execution checklist for producing a complete, safe, reproducible Windows x64 desktop package. **Mark a task `[x]` only after its stated work and checks actually pass.** A successful compile is not the same as a hardware-validated release.
 
+## Active follow-up — Microsoft Windows development skills (PR #28)
+
+### Phase 1 — Skill review and applicability
+- [x] Read `microsoft/win-dev-skills` and its pinned `winui` / `winappcli` guidance.
+- [x] Select the cross-framework `winapp-ui-automation` skill and transferable design practices for this PySide6 app.
+- [x] Keep WinUI-only XAML/API samples and MSIX conversion out of scope; the app is PySide6 and uses an established EXE/installer release path.
+
+### Phase 2 — Focused app improvements
+- [x] Add a selectable, high-contrast appearance and carry it through widgets, status log, and generated wiring views.
+- [x] Strengthen visible keyboard-focus styling and align shared control spacing to a four-pixel rhythm.
+- [x] Give key operation/status controls clear accessible names and preserve existing safety language.
+- [x] Add Windows UI Automation coverage using `winapp ui` for the main workbench’s key controls.
+
+### Phase 3 — Verification
+- [x] Run pure-Python/theme and non-GUI regression tests plus compile/whitespace checks locally.
+- [ ] Run full GUI and `winapp ui` checks on Windows CI; record failures/limits rather than marking unverified work complete.
+- [ ] Review PR checks and update this phase checklist with actual outcomes.
+
+Local results: `PYTHONPATH=.:src .venv/bin/pytest -q src/tests --ignore=src/tests/test_gui.py` passed (42 tests, 29 subtests); `compileall` and `git diff --check` passed. Windows GUI/UIA execution is still pending.
+
 ## Goal and release definition
 
 - Deliver a portable Windows 10/11 x64 package that a user can extract and launch by double-clicking `Arduino-PIC-Programmer.exe`, without installing Python or separately downloading runtime dependencies.

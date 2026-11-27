@@ -219,6 +219,30 @@ jobs:
             if (!$Process.HasExited) { Stop-Process -Id $Process.Id -Force }
           }
 
+      - name: Install WinApp CLI for UI Automation
+        shell: pwsh
+        run: |
+          winget install --id Microsoft.WinAppCli --exact --version 0.7.1 --source winget `
+            --silent --accept-source-agreements --accept-package-agreements
+          if ($LASTEXITCODE -ne 0) { throw 'Could not install the pinned WinApp CLI 0.7.1.' }
+          $WinGetLinks = Join-Path $env:LOCALAPPDATA 'Microsoft/WinGet/Links'
+          $WindowsApps = Join-Path $env:LOCALAPPDATA 'Microsoft/WindowsApps'
+          foreach ($Path in @($WinGetLinks, $WindowsApps)) {
+            if (Test-Path $Path) { $Path | Add-Content $env:GITHUB_PATH; $env:PATH = "$Path;$env:PATH" }
+          }
+          if (!(Get-Command winapp -ErrorAction SilentlyContinue)) {
+            throw 'WinApp CLI installed but winapp.exe is not on PATH.'
+          }
+          winapp --version
+
+      - name: Check packaged app accessibility with WinApp UI Automation
+        shell: pwsh
+        run: |
+          $Exe = (Resolve-Path 'dist/Arduino-PIC-Programmer/Arduino-PIC-Programmer.exe').Path
+          ./scripts/check_ui_accessibility.ps1 -ApplicationPath $Exe
+          if ($LASTEXITCODE -ne 0) { throw 'WinApp UI Automation check failed.' }
+          'WinApp UI Automation found the main workbench controls.' | Add-Content $env:GITHUB_STEP_SUMMARY
+
       - name: Install Inno Setup compiler
         shell: pwsh
         run: |

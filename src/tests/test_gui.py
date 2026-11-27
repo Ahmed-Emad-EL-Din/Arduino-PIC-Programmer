@@ -323,8 +323,30 @@ class TestGUIIntegration(unittest.TestCase):
         self.win.apply_theme("light", 10)
         self.assertEqual(self.win.settings.theme, "light")
         capture_window(self.win, "main-light-no-hardware.png")
+
+        self.win.settings.theme = "high_contrast"
+        self.win.apply_theme("high_contrast", self.win.settings.font_size)
+        self.assertEqual(self.win.circuit_panel._theme, "high_contrast")
+        self.assertIn("#ffff00", self.win.circuit_panel.schem_view.svg_bytes.decode("utf-8"))
+        capture_window(self.win, "main-high-contrast-no-hardware.png")
+
         self.win.settings.theme = "dark"
         self.win.apply_theme("dark", self.win.settings.font_size)
+
+    def test_primary_controls_have_clear_accessible_names(self):
+        expected = {
+            self.win.btn_connect: "Connect programmer",
+            self.win.btn_detect: "Detect PIC target",
+            self.win.btn_open_hex: "Open HEX file",
+            self.win.btn_program: "Program PIC from selected HEX file",
+            self.win.btn_verify: "Verify PIC against selected HEX file",
+            self.win.status_lbl: "Operation status",
+            self.win.progress: "Operation progress",
+            self.win.circuit_panel.tabs: "Programmer reference and data views",
+        }
+        for widget, name in expected.items():
+            with self.subTest(name=name):
+                self.assertEqual(widget.accessibleName(), name)
 
     def test_circuit_drawer_integration(self):
         # Ensure circuit drawer produces valid SVG for the panel

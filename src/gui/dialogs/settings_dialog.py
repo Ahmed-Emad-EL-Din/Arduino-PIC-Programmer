@@ -15,8 +15,12 @@ class SettingsDialog(QDialog):
         self.theme = QComboBox()
         self.theme.addItem("Dark", "dark")
         self.theme.addItem("Light", "light")
+        self.theme.addItem("High contrast", "high_contrast")
         self.theme.setCurrentIndex(max(0, self.theme.findData(settings.theme)))
-        self.theme.setToolTip("Changes appearance only; status text remains explicit in both themes.")
+        self.theme.setToolTip(
+            "Changes appearance only. The manual high-contrast palette uses a black background, "
+            "white text, and bright focus/status colors."
+        )
         form.addRow("Appearance:", self.theme)
         self.board = QComboBox()
         for board in BOARDS:

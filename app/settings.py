@@ -28,11 +28,13 @@ class AppSettings:
     @property
     def theme(self) -> str:
         value = str(self._get("theme", "dark"))
-        return value if value in ("dark", "light") else "dark"
+        return value if value in ("dark", "light", "high_contrast") else "dark"
 
     @theme.setter
     def theme(self, value: str) -> None:
-        self._settings.setValue("theme", value if value in ("dark", "light") else "dark")
+        self._settings.setValue(
+            "theme", value if value in ("dark", "light", "high_contrast") else "dark"
+        )
 
     @property
     def font_size(self) -> int:

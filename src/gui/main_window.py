@@ -254,9 +254,11 @@ class MainWindow(QMainWindow):
 
         self.status_lbl = QLabel("Idle")
         self.status_lbl.setObjectName("muted")
+        self.status_lbl.setAccessibleName("Operation status")
         psl.addWidget(self.status_lbl, 2)
 
         self.progress = QProgressBar()
+        self.progress.setAccessibleName("Operation progress")
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
         self.progress.setMaximumWidth(280)
@@ -264,6 +266,7 @@ class MainWindow(QMainWindow):
         self.progress.setVisible(False)
 
         self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.setAccessibleName("Cancel current hardware operation")
         self.btn_cancel.setObjectName("dangerOutline")
         self.btn_cancel.setFixedHeight(26)
         self.btn_cancel.setEnabled(False)
@@ -366,14 +369,17 @@ class MainWindow(QMainWindow):
         btns = QHBoxLayout()
         btns.setSpacing(6)
         self.btn_connect = QPushButton("Connect")
+        self.btn_connect.setAccessibleName("Connect programmer")
         self.btn_connect.setObjectName("primary")
         self.btn_connect.clicked.connect(self._connect)
 
         self.btn_disconnect = QPushButton("Disconnect")
+        self.btn_disconnect.setAccessibleName("Disconnect programmer")
         self.btn_disconnect.setVisible(False)
         self.btn_disconnect.clicked.connect(self._disconnect)
 
         self.btn_flash_ard = QPushButton("Install Firmware…")
+        self.btn_flash_ard.setAccessibleName("Install Arduino firmware")
         self.btn_flash_ard.setToolTip(
             "Install or update ProgramPic v1.8.horo on the selected Arduino. This replaces its current sketch."
         )
@@ -411,6 +417,7 @@ class MainWindow(QMainWindow):
         mcu_row.addWidget(self.cmb_mcu, 1)
 
         self.btn_detect = QPushButton("Detect PIC")
+        self.btn_detect.setAccessibleName("Detect PIC target")
         self.btn_detect.setToolTip("Ask the programmer to identify the PIC.")
         self.btn_detect.clicked.connect(self._detect)
         mcu_row.addWidget(self.btn_detect)
@@ -487,6 +494,7 @@ class MainWindow(QMainWindow):
         file_row = QHBoxLayout()
         file_row.setSpacing(6)
         self.btn_open_hex = QPushButton("Open HEX…")
+        self.btn_open_hex.setAccessibleName("Open HEX file")
         self.btn_open_hex.setToolTip("Load a HEX file.")
         self.btn_open_hex.clicked.connect(self.open_hex)
 
@@ -540,11 +548,13 @@ class MainWindow(QMainWindow):
         act_row = QHBoxLayout()
         act_row.setSpacing(6)
         self.btn_program = QPushButton("Program PIC…")
+        self.btn_program.setAccessibleName("Program PIC from selected HEX file")
         self.btn_program.setObjectName("primary")
         self.btn_program.setMinimumHeight(36)
         self.btn_program.clicked.connect(self._program)
 
         self.btn_verify = QPushButton("Verify Only")
+        self.btn_verify.setAccessibleName("Verify PIC against selected HEX file")
         self.btn_verify.setMinimumHeight(36)
         self.btn_verify.clicked.connect(self._verify_only)
 
@@ -667,7 +677,7 @@ class MainWindow(QMainWindow):
         act_t_hex.triggered.connect(lambda: self.circuit_panel.tabs.setCurrentIndex(2))
         m_view.addAction(act_t_hex)
 
-        act_t_ref = QAction("Show ArdPicProg Reference Tab", self)
+        act_t_ref = QAction("Show Circuit Reference Tab", self)
         act_t_ref.setShortcut(QKeySequence("Alt+4"))
         act_t_ref.triggered.connect(lambda: self.circuit_panel.tabs.setCurrentIndex(3))
         m_view.addAction(act_t_ref)
