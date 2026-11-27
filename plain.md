@@ -20,7 +20,7 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 - [ ] Run full GUI and `winapp ui` checks on Windows CI; record failures/limits rather than marking unverified work complete.
 - [ ] Review PR checks and update this phase checklist with actual outcomes.
 
-Local results: `PYTHONPATH=.:src .venv/bin/pytest -q src/tests --ignore=src/tests/test_gui.py` passed (42 tests, 29 subtests); `compileall`, workflow YAML parsing, and `git diff --check` passed. Windows run `46045666587` reached GUI tests and exposed stale assertions around the HEX compatibility text and the no-port guidance (the earlier run also caught case-sensitive firmware wording and an incomplete HEX fixture). The assertions/fixture are corrected; a fresh Windows GUI/UIA run is pending.
+Local results: `PYTHONPATH=.:src .venv/bin/pytest -q src/tests --ignore=src/tests/test_gui.py` passed (42 tests, 29 subtests); `compileall`, workflow YAML parsing, and `git diff --check` passed. Windows run `46046017363` passed the earlier corrected tests and exposed one further stale target-mismatch wording assertion. The expected text is aligned to the current guidance; another Windows GUI/UIA run is pending. Earlier Windows runs also caught stale HEX/no-port/case assertions and an incomplete HEX fixture, all corrected.
 
 ## Goal and release definition
 

@@ -198,7 +198,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertFalse(self.win.btn_program.isEnabled())
         self.assertTrue(self.win.btn_detect.isEnabled())
         self.assertEqual(self.win.btn_detect.objectName(), "primary")
-        self.assertIn("Blocked:", self.win.lbl_target_guidance.text())
+        self.assertIn("last detected PIC12F675", self.win.lbl_target_guidance.text())
 
     def test_close_defers_until_active_hardware_worker_exits(self):
         started = threading.Event()
