@@ -26,7 +26,10 @@ class SettingsDialog(QDialog):
         for board in BOARDS:
             self.board.addItem(board.label, board.key)
         self.board.setCurrentIndex(max(0, self.board.findData(settings.board_key)))
-        self.board.setToolTip("Selects the wiring reference; it does not detect which board is connected.")
+        self.board.setToolTip(
+            "Selects the wiring reference and Nano bootloader profile; it does not detect the board. "
+            "The 9600-baud ProgramPic link is independent of bootloader upload speed."
+        )
         form.addRow("Arduino board:", self.board)
         self.mcu = QComboBox()
         # avoid a circular import from the workbench
@@ -38,7 +41,7 @@ class SettingsDialog(QDialog):
         self.baud = QSpinBox()
         self.baud.setRange(9600, 1000000)
         self.baud.setValue(settings.baud)
-        self.baud.setToolTip("ProgramPic serial link. Default: 115200 baud.")
+        self.baud.setToolTip("ProgramPic serial link. Default: 9600 baud.")
         form.addRow("Serial speed:", self.baud)
         self.verify = QCheckBox("Read back and compare after programming")
         self.verify.setChecked(settings.auto_verify)

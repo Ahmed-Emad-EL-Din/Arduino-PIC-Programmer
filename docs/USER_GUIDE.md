@@ -38,7 +38,7 @@ For a PIC16F84A in the published ZIF shield, JP3 is commonly set to 1-2; an 8-pi
 
 ### Step 2 — Install ProgramPic firmware if needed
 1. In the **Programmer** card, select the Arduino model and port, then choose **Install Firmware…**.
-2. The dialog tells you if firmware upload isn't supported for the selected board. Leonardo/Micro must be flashed using Arduino IDE. For Nano, choose the matching old/new bootloader.
+2. The dialog tells you if firmware upload isn't supported for the selected board. Leonardo/Micro must be flashed using Arduino IDE. For Nano, the app always tries the 115200-baud bootloader first and retries at 57600 only if it cannot synchronize; the displayed old/new bootloader profile reflects the successful speed. This upload speed is separate from the ProgramPic runtime serial link, which is 9600 baud. The runtime rate is not a Microchip PICkit setting: this project uses an Arduino running ProgramPic. Reflash an older sketch if it was built for a different runtime baud before trying to connect.
 3. Upload replaces the Arduino's current sketch. Keep USB connected and remove/reinstall the reset capacitor as directed by the dialog.
 
 ### Step 3 — Connect & verify
@@ -83,7 +83,7 @@ The app must not be considered production-ready until Windows and physical-devic
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| No ProgramPic response | Firmware missing, wrong port, or port busy | Install ProgramPic and reconnect at 115200 baud. Close other serial apps; rescan if the port is missing. |
+| No ProgramPic response | Firmware missing, wrong port, or port busy | Install the matching ProgramPic firmware and reconnect at 9600 baud. Close other serial apps; rescan if the port is missing. |
 | “No response from the Arduino” | Wrong port / firmware missing / Serial Monitor open | Rescan ports, flash firmware, close Serial Monitor |
 | “avrdude failed — not in sync” | Wrong board variant or port | Try Nano *Old Bootloader*; press reset and retry |
 | `DEVICE failed` | Empty socket, VPP off, chip backwards | Check red VPP LED, pin-1 orientation, lever |
@@ -92,7 +92,7 @@ The app must not be considered production-ready until Windows and physical-devic
 | Port busy / access denied | Another program using the port | Close MPLAB/QPICkit/Serial Monitor |
 | HEX “outside memory map” | HEX from a different MCU | Load the HEX built for your selected target |
 
-The ProgramPic-to-app link and Nano upload both try 115200 baud first. Nano upload retries at 57600 if synchronization fails. If upload fails, check the selected port and close other serial apps.
+The ProgramPic-to-app runtime link uses 9600 baud. Nano firmware upload is a separate bootloader connection: it tries 115200 first and retries at 57600 if synchronization fails. If upload fails, check the selected port and close other serial apps.
 
 For an unexpected operation error, use **Copy details** in the error dialog and share that text along with the exported Activity Log. The full rotating diagnostic log is saved at the path shown in the error dialog (up to 2 MB per file, with three backups). If a hardware operation is active when you close the app, the app requests cancellation and stays open until the serial host exits safely; do not force-terminate it while it is writing to a PIC.
 

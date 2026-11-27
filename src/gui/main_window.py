@@ -326,7 +326,10 @@ class MainWindow(QMainWindow):
         self.cmb_board.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.cmb_board.setMinimumContentsLength(18)
         self.cmb_board.setAccessibleName("Arduino board type")
-        self.cmb_board.setToolTip("Board type configures the wiring diagram; it does not detect the connected board.")
+        self.cmb_board.setToolTip(
+            "Selects the wiring reference and Nano bootloader profile; it does not detect the connected board. "
+            "Bootloader upload speed is separate from the 9600-baud ProgramPic link."
+        )
         for b in BOARDS:
             self.cmb_board.addItem(b.label, b.key)
         b_idx = self.cmb_board.findData(self.board_key)
@@ -1327,7 +1330,7 @@ class MainWindow(QMainWindow):
         if cur_port:
             self.settings.port = cur_port
 
-        dlg = FlashArduinoDialog(self.settings, self.lane, self)
+        dlg = FlashArduinoDialog(self.settings, self.lane, self, board_key=self.board_key)
 
         def _on_flashed(port: str, bkey: str) -> None:
             b_idx = self.cmb_board.findData(bkey)

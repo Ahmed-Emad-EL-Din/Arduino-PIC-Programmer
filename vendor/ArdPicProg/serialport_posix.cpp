@@ -135,7 +135,7 @@ bool SerialPort::open(const std::string &deviceName, int speed)
         fprintf(stderr,
                 "%s: no ProgramPic response after 10 seconds at %d baud. "
                 "Install ProgramPic firmware, check the serial port and bootloader, "
-                "use 115200 baud for ProgramPic, and close other serial tools.\n",
+                "use 9600 baud for ProgramPic, and close other serial tools.\n",
                 deviceName.c_str(), speed);
     }
     return false;
