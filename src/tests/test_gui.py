@@ -56,7 +56,7 @@ class TestGUIIntegration(unittest.TestCase):
             "Connect Programmer",
             "COM4: no ProgramPic response after 10 seconds at 115200 baud.",
         )
-        self.assertIn("Install Firmware", message)
+        self.assertIn("install firmware", message.lower())
         self.assertIn("115200", message)
 
     def test_main_window_initialization(self):
@@ -147,6 +147,9 @@ class TestGUIIntegration(unittest.TestCase):
             w = 0x3000 | (i & 0xFF)
             img.data[i * 2] = w & 0xFF
             img.data[i * 2 + 1] = (w >> 8) & 0xFF
+        # Include the PIC16F84A config word so this fixture has no missing-fuse warning.
+        img.data[0x400E] = 0xFF
+        img.data[0x400F] = 0x3F
         self.win.hex_img = img
         self.win.hex_path = "/demo/blink_pic16f84a.hex"
         self.win.session.state.verified = True
@@ -161,7 +164,7 @@ class TestGUIIntegration(unittest.TestCase):
             "does not verify target identity",
             self.win.circuit_panel.hex_summary_lbl.text(),
         )
-        self.assertIn("Addresses fit", self.win.lbl_hex_guidance.text())
+        self.assertIn("HEX fits", self.win.lbl_hex_guidance.text())
         self.assertIn("does not verify target identity", self.win.lbl_hex_guidance.text())
         capture_window(self.win, "hex-inspector-dark.png")
 
