@@ -147,7 +147,7 @@ jobs:
             throw "Unexpected bundled tools. Unexpected: $($UnexpectedTools -join ', '); missing: $($MissingTools -join ', ')"
           }
           $ProductVersion = (Get-Item "$Package/Arduino-PIC-Programmer.exe").VersionInfo.ProductVersion
-          if ($ProductVersion -notlike '2.2.1*') { throw "Unexpected application product version: $ProductVersion" }
+          if ($ProductVersion -notlike '2.2.2*') { throw "Unexpected application product version: $ProductVersion" }
           $BoardKeys = @('uno', 'nano_new', 'nano_old', 'pro_mini_5v', 'mega2560', 'leonardo', 'micro')
           foreach ($Key in $BoardKeys) {
             $Firmware = "$Internal/firmware/precompiled/$Key.hex"
@@ -331,7 +331,7 @@ jobs:
             Where-Object { $_.DisplayName -eq 'Arduino-PIC Programmer' } |
             Select-Object -First 1
           if (!$InstalledEntry) { throw 'Installer did not register in Windows Installed Apps.' }
-          if ($InstalledEntry.DisplayVersion -ne '2.2.1' -or $InstalledEntry.DisplayIcon -notlike '*Arduino-PIC-Programmer.exe*') {
+          if ($InstalledEntry.DisplayVersion -ne '2.2.2' -or $InstalledEntry.DisplayIcon -notlike '*Arduino-PIC-Programmer.exe*') {
             throw 'Installed Apps entry is missing the app version or branded app icon.'
           }
           $env:QT_QPA_PLATFORM = 'offscreen'
