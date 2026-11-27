@@ -39,10 +39,10 @@ Do not disable SmartScreen or bypass its warning for an unvalidated candidate. V
 
 ### User-supplied circuit diagram
 
-[Open the supplied editable diagrams.net source](assets/reference/user-circuit-diagram.drawio). This is an unverified reference, not a build guide: it includes a 24 V supply/regulator drawing and may not match the firmware's pin mapping or safe VPP requirements. Do not wire or power hardware from this source alone. Follow the exact target datasheet and current pinout/safety notes below; independently verify the VPP circuit before connecting a PIC. A faithful image export is not included yet because current conversion attempts alter or omit diagram details.
+The app renders the supplied editable [diagrams.net source](assets/reference/user-circuit-diagram.drawio) as an image in its single **Circuit Reference** view, with the selected board/PIC connection table directly below it. The drawing is unverified: it includes a 24 V supply/regulator and may not match the firmware pin map or safe VPP requirements. The table is a separate firmware connection map—not proof that the drawing is compatible. Do not wire or power hardware from either source alone; check the exact target datasheet and hardware documentation, and independently verify the VPP circuit. The app's offline renderer displays embedded diagram content without requiring diagrams.net or a network connection.
 
 ### Wiring notes for supported PIC packages
-The desktop inspector's generated view is illustrative, not an electrical schematic; confirm all connections against the exact device datasheet. Unverified pin mappings are flagged.
+The desktop inspector shows the user-supplied circuit image and a separate firmware connection table; neither replaces the exact device datasheet. Unverified pin mappings are flagged, and the table does not certify the drawing.
 
 **A. ZIF-18 Direct Mode (8-pin & 18-pin PICs)**
 *   **PIC16F84A (18-pin):** JP3 = `1-2`. Pins: VDD=14, VSS=5, MCLR=4(RA5), PGC=12(RB6), PGD=13(RB7), PGM=10(RB4).

@@ -27,7 +27,9 @@ try {
         'Connect programmer',
         'Open HEX file',
         'Program PIC from selected HEX file',
-        'Operation status'
+        'Operation status',
+        'Circuit reference',
+        'Point-to-point hardware connections'
     )
 
     # Give the packaged app one bounded startup window, then check every required
