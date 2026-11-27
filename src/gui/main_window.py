@@ -35,7 +35,6 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QSplitter,
-    QToolBar,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -188,15 +187,13 @@ class MainWindow(QMainWindow):
         hl.addLayout(title_col)
         hl.addStretch()
 
-        self.chip_board = StatusChip(190)
+        # Keep only the two live statuses that are not already obvious from the
+        # board/PIC selectors and the HEX card below.
         self.chip_prog = StatusChip(190)
         self.chip_target = StatusChip(210)
-        self.chip_file = StatusChip(190)
         for chip, name in (
-            (self.chip_board, "Selected Arduino board"),
             (self.chip_prog, "Programmer connection status"),
             (self.chip_target, "Selected PIC target"),
-            (self.chip_file, "Loaded HEX file status"),
         ):
             chip.setObjectName("chip")
             chip.setAccessibleName(name)
@@ -228,7 +225,7 @@ class MainWindow(QMainWindow):
         lcol.addStretch(1)
         left_scroll.setWidget(left_body)
 
-        # Right pane: illustrative wiring overview, IC pinout, and HEX inspector
+        # Right pane: one circuit reference with the selected wiring table below
         right_wrap = QWidget()
         right_wrap.setObjectName("inspectorPane")
         right_wrap.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -502,13 +499,8 @@ class MainWindow(QMainWindow):
         self.btn_reload_hex.setToolTip("Reload the current .hex file from disk")
         self.btn_reload_hex.clicked.connect(self._reload_hex)
 
-        self.btn_inspect_hex = QPushButton("HEX Map")
-        self.btn_inspect_hex.setToolTip("Open the HEX Memory Map tab on the right")
-        self.btn_inspect_hex.clicked.connect(lambda: self.circuit_panel.tabs.setCurrentIndex(2))
-
         file_row.addWidget(self.btn_open_hex, 2)
         file_row.addWidget(self.btn_reload_hex, 1)
-        file_row.addWidget(self.btn_inspect_hex, 1)
         lay.addLayout(file_row)
 
         hex_box = QFrame()
@@ -564,7 +556,7 @@ class MainWindow(QMainWindow):
         return card
 
     # ------------------------------------------------------------------
-    # Menus & Primary Toolbar
+    # Menus
     # ------------------------------------------------------------------
     def _build_menus_and_toolbar(self) -> None:
         mb = self.menuBar()
@@ -585,9 +577,9 @@ class MainWindow(QMainWindow):
         self.act_save.triggered.connect(self._read_chip)
         m_file.addAction(self.act_save)
 
-        self.act_export_schem = QAction("Export Wiring Overview…", self)
-        self.act_export_schem.triggered.connect(self.circuit_panel._export_schematic)
-        m_file.addAction(self.act_export_schem)
+        self.act_export_reference = QAction("Export Circuit Reference…", self)
+        self.act_export_reference.triggered.connect(self.circuit_panel._export_reference)
+        m_file.addAction(self.act_export_reference)
 
         self.act_export_log = QAction("Export Activity Log…", self)
         self.act_export_log.triggered.connect(self.log_pane._save)
@@ -662,27 +654,6 @@ class MainWindow(QMainWindow):
         m_view.addAction(self.act_log)
 
         m_view.addSeparator()
-        act_t_schem = QAction("Show Wiring Overview Tab", self)
-        act_t_schem.setShortcut(QKeySequence("Alt+1"))
-        act_t_schem.triggered.connect(lambda: self.circuit_panel.tabs.setCurrentIndex(0))
-        m_view.addAction(act_t_schem)
-
-        act_t_pin = QAction("Show IC Pinout && Wiring Tab", self)
-        act_t_pin.setShortcut(QKeySequence("Alt+2"))
-        act_t_pin.triggered.connect(lambda: self.circuit_panel.tabs.setCurrentIndex(1))
-        m_view.addAction(act_t_pin)
-
-        act_t_hex = QAction("Show HEX Memory Map Tab", self)
-        act_t_hex.setShortcut(QKeySequence("Alt+3"))
-        act_t_hex.triggered.connect(lambda: self.circuit_panel.tabs.setCurrentIndex(2))
-        m_view.addAction(act_t_hex)
-
-        act_t_ref = QAction("Show Circuit Reference Tab", self)
-        act_t_ref.setShortcut(QKeySequence("Alt+4"))
-        act_t_ref.triggered.connect(lambda: self.circuit_panel.tabs.setCurrentIndex(3))
-        m_view.addAction(act_t_ref)
-
-        m_view.addSeparator()
         act_zin = QAction("Increase UI Font Size", self)
         act_zin.setShortcut(QKeySequence.StandardKey.ZoomIn)
         act_zin.triggered.connect(lambda: self._zoom_font(+1))
@@ -730,18 +701,6 @@ class MainWindow(QMainWindow):
         self.act_about.triggered.connect(lambda: AboutDialog(self).exec())
         m_help.addAction(self.act_about)
 
-        # Keep the toolbar to high-frequency actions; specialist operations stay
-        # in their task cards or the Programmer menu to reduce duplicate controls.
-        tb = QToolBar("Quick actions", self)
-        tb.setObjectName("mainToolbar")
-        tb.setMovable(False)
-        tb.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        tb.addAction(self.act_open)
-        tb.addSeparator()
-        tb.addAction(self.act_connect)
-        tb.addAction(self.act_program)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, tb)
-
     # ------------------------------------------------------------------
     # Theme & Icon Synchronization
     # ------------------------------------------------------------------
@@ -754,7 +713,7 @@ class MainWindow(QMainWindow):
         ic_col = t.subtext
         self.act_open.setIcon(icon("open", ic_col))
         self.act_save.setIcon(icon("download", ic_col))
-        self.act_export_schem.setIcon(icon("circuit", ic_col))
+        self.act_export_reference.setIcon(icon("circuit", ic_col))
         self.act_export_log.setIcon(icon("log", ic_col))
         self.act_ports.setIcon(icon("refresh", ic_col))
         self.act_flash.setIcon(icon("upload", ic_col))
@@ -951,11 +910,9 @@ class MainWindow(QMainWindow):
         self._refresh_actions()
 
     def _refresh_hex_summary(self) -> None:
-        self.circuit_panel.set_hex_image(self.hex_img)
         if self.hex_img is None or self.hex_img.is_empty():
             self.lbl_hex_name.setText("No .hex file loaded")
             self.lbl_hex_stats.setText("Program: —  ·  EEPROM: —  ·  Config: —")
-            self._set_chip_state(self.chip_file, "HEX: none", "neutral")
             self._set_guidance(
                 self.lbl_hex_guidance,
                 "Open a HEX file to continue.",
@@ -976,7 +933,6 @@ class MainWindow(QMainWindow):
             f"EEPROM: {eb}/{self.target.data_bytes} B  ·  Config: {cw} w"
         )
         if oot:
-            self._set_chip_state(self.chip_file, f"HEX: range mismatch ({len(oot)})", "bad")
             first = ", ".join(f"0x{int(addr):04X}" for addr in oot[:3])
             more = f" and {len(oot) - 3} more" if len(oot) > 3 else ""
             self._set_guidance(
@@ -987,15 +943,13 @@ class MainWindow(QMainWindow):
         elif hex_warnings:
             note = " ".join(hex_warnings[:2])
             if len(hex_warnings) > 2:
-                note += f" ({len(hex_warnings) - 2} more warning(s) in Inspect Map.)"
-            self._set_chip_state(self.chip_file, f"HEX: review {len(hex_warnings)} warning(s)", "warn")
+                note += f" ({len(hex_warnings) - 2} more warning(s) in this HEX file.)"
             self._set_guidance(
                 self.lbl_hex_guidance,
                 f"Check HEX warnings: {note}",
                 "warn",
             )
         else:
-            self._set_chip_state(self.chip_file, f"HEX: {fname}", "ok")
             self._set_guidance(
                 self.lbl_hex_guidance,
                 f"HEX fits {self.target.display_name}.",
@@ -1058,12 +1012,6 @@ class MainWindow(QMainWindow):
                 "Select a port, then connect. Install ProgramPic if needed.",
             )
 
-        bw = get_board_wiring(self.board_key)
-        self._set_chip_state(
-            self.chip_board,
-            f"Board: {bw.board_name}",
-            "warn" if self.board_key == "pro_mini_5v" else "neutral",
-        )
         if conn:
             self._set_chip_state(
                 self.chip_prog,
@@ -1100,7 +1048,6 @@ class MainWindow(QMainWindow):
 
         self.btn_open_hex.setEnabled(not busy)
         self.btn_reload_hex.setEnabled(not busy and bool(self.hex_path))
-        self.btn_inspect_hex.setEnabled(not busy and has_hex)
         self.btn_program.setEnabled(not busy and conn and has_hex and hex_fits and not target_mismatch)
         self.btn_verify.setEnabled(not busy and conn and has_hex and hex_fits and not target_mismatch)
         self.progress.setVisible(busy)
@@ -1116,7 +1063,7 @@ class MainWindow(QMainWindow):
             elif not has_hex:
                 next_action = self.btn_open_hex
             elif not hex_fits:
-                next_action = self.btn_inspect_hex
+                next_action = self.btn_open_hex
             else:
                 next_action = self.btn_program
         for button in (
@@ -1124,7 +1071,6 @@ class MainWindow(QMainWindow):
             self.btn_connect,
             self.btn_detect,
             self.btn_open_hex,
-            self.btn_inspect_hex,
             self.btn_program,
         ):
             self._set_primary_button(button, button is next_action)
@@ -1626,7 +1572,7 @@ class MainWindow(QMainWindow):
             self.hex_path = ""
             self._refresh_hex_summary()
             self._refresh_actions()
-            self.circuit_panel.tabs.setCurrentIndex(2)
+            self.circuit_panel.tabs.setCurrentIndex(0)
 
             path, _ = QFileDialog.getSaveFileName(
                 self,
@@ -1646,7 +1592,7 @@ class MainWindow(QMainWindow):
                 )
             else:
                 self.log(
-                    f"Read {dev.display_name} into HEX Memory Map buffer (file save skipped).",
+                    f"Read {dev.display_name} into an in-memory HEX backup (file save skipped).",
                     "INFO",
                 )
                 self.status_lbl.setText(f"Read {dev.display_name} into memory inspector")

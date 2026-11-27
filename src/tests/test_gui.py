@@ -64,10 +64,10 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertEqual(self.win.settings.baud, 115200)
         self.assertFalse(self.win.brand_icon.pixmap().isNull())
         self.assertFalse(self.win.log_dock.isVisible())
-        toolbar = self.win.findChild(QToolBar, "mainToolbar")
-        self.assertIsNotNone(toolbar)
-        toolbar_actions = [action.text() for action in toolbar.actions() if not action.isSeparator()]
-        self.assertEqual(toolbar_actions, ["Open HEX…", "&Connect Programmer", "Program PIC…"])
+        self.assertIsNone(self.win.findChild(QToolBar, "mainToolbar"))
+        self.assertEqual(self.win.circuit_panel.tabs.count(), 1)
+        self.assertEqual(self.win.circuit_panel.tabs.tabText(0), "Circuit Reference")
+        self.assertTrue(self.win.circuit_panel.reference_view._renderer.isValid())
         self.assertFalse(self.win.progress.isVisible())
         self.assertFalse(self.win.btn_cancel.isVisible())
         self.assertIsNotNone(self.win.circuit_panel)
@@ -91,10 +91,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.win.resize(1000, 620)
         QApplication.processEvents()
         self.assertEqual(self.win.minimumSize().width(), 1000)
-        for chip in (
-            self.win.chip_board, self.win.chip_prog,
-            self.win.chip_target, self.win.chip_file,
-        ):
+        for chip in (self.win.chip_prog, self.win.chip_target):
             self.assertTrue(chip.text())
             self.assertTrue(chip.toolTip())
         self.assertTrue(self.win.circuit_panel.isVisible())
@@ -131,15 +128,15 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertTrue(self.win.target_tools_panel.isVisible())
         self.assertEqual(self.win.btn_more_target.accessibleName(), "Hide more target actions")
 
-    def test_circuit_panel_tabs(self):
+    def test_circuit_reference_is_the_only_diagram_and_table_follows_it(self):
         panel = self.win.circuit_panel
-        self.assertEqual(panel.tabs.count(), 4)
-        panel.tabs.setCurrentIndex(0)
-        panel.schem_view.zoom_fit()
-        panel.tabs.setCurrentIndex(1)
-        panel.pinout_view.zoom_fit()
-        panel.tabs.setCurrentIndex(2)
-        panel.tabs.setCurrentIndex(3)
+        self.assertEqual(panel.tabs.count(), 1)
+        self.assertEqual(panel.tabs.tabText(0), "Circuit Reference")
+        self.assertTrue(panel.reference_view._renderer.isValid())
+        self.assertGreater(panel.wiring_table.rowCount(), 0)
+        self.assertEqual(panel.wiring_table.accessibleName(), "Point-to-point hardware connections")
+        panel.reference_view.zoom_in()
+        panel.reference_view.zoom_fit()
 
     def test_hex_image_integration(self):
         img = HexImage()
@@ -158,12 +155,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.win._refresh_actions()
         self.assertTrue(self.win.btn_program.isEnabled())
         self.assertEqual(self.win.btn_program.objectName(), "primary")
-        self.win.circuit_panel.set_hex_image(img)
-        self.win.circuit_panel.tabs.setCurrentIndex(2)
-        self.assertIn(
-            "does not verify target identity",
-            self.win.circuit_panel.hex_summary_lbl.text(),
-        )
+        self.assertIn("Loaded:", self.win.lbl_hex_name.text())
         self.assertIn("HEX fits", self.win.lbl_hex_guidance.text())
         capture_window(self.win, "hex-inspector-dark.png")
 
@@ -179,7 +171,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.win._refresh_actions()
         self.assertFalse(self.win.btn_program.isEnabled())
         self.assertFalse(self.win.btn_verify.isEnabled())
-        self.assertEqual(self.win.btn_inspect_hex.objectName(), "primary")
+        self.assertEqual(self.win.btn_open_hex.objectName(), "primary")
         self.assertIn("outside", self.win.btn_program.toolTip())
 
     def test_reported_target_mismatch_blocks_hardware_actions(self):
@@ -329,7 +321,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.win.settings.theme = "high_contrast"
         self.win.apply_theme("high_contrast", self.win.settings.font_size)
         self.assertEqual(self.win.circuit_panel._theme, "high_contrast")
-        self.assertIn("#ffff00", self.win.circuit_panel.schem_view.svg_bytes.decode("utf-8"))
+        self.assertTrue(self.win.circuit_panel.reference_view._renderer.isValid())
         capture_window(self.win, "main-high-contrast-no-hardware.png")
 
         self.win.settings.theme = "dark"
@@ -344,21 +336,22 @@ class TestGUIIntegration(unittest.TestCase):
             self.win.btn_verify: "Verify PIC against selected HEX file",
             self.win.status_lbl: "Operation status",
             self.win.progress: "Operation progress",
-            self.win.circuit_panel.tabs: "Programmer reference and data views",
+            self.win.circuit_panel.tabs: "Circuit reference",
         }
         for widget, name in expected.items():
             with self.subTest(name=name):
                 self.assertEqual(widget.accessibleName(), name)
 
-    def test_circuit_drawer_integration(self):
-        # Ensure circuit drawer produces valid SVG for the panel
+    def test_circuit_reference_source_renders_as_an_image(self):
         dev = lookup("pic16f84a")
-        board_key = "uno"
-        self.win.cmb_board.setCurrentIndex(self.win.cmb_board.findData(board_key))
+        self.win.cmb_board.setCurrentIndex(self.win.cmb_board.findData("uno"))
         self.win.cmb_mcu.setCurrentIndex(self.win.cmb_mcu.findData(dev.name))
         self.win._sync_inspector()
-        self.assertIsNotNone(self.win.circuit_panel.schem_view._svg_bytes)
-        self.assertTrue(len(self.win.circuit_panel.schem_view._svg_bytes) > 0)
+        svg = self.win.circuit_panel.reference_view.svg_bytes
+        self.assertTrue(svg.startswith(b"<svg"))
+        self.assertIn(b"<image", svg)
+        self.assertTrue(self.win.circuit_panel.reference_view._renderer.isValid())
+        self.assertIn("unverified", self.win.circuit_panel.reference_notice.text().lower())
 
 if __name__ == "__main__":
     unittest.main()

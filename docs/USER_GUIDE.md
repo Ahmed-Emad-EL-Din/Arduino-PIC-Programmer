@@ -24,7 +24,7 @@ The firmware uploaded by this app uses the following Arduino Nano wiring. The up
 
 Use an Arduino (Nano / Uno / Pro Mini / Mega / Leonardo) and a PIC target. The pin assignments above are the firmware profile; check the exact board pin aliases and PIC package datasheet before wiring. The VPP switching circuit—not A1 itself—must route the external programming voltage to MCLR/VPP. Keep the PIC's documented VPP input isolated from Arduino GPIO and verify supply polarity/voltage before attaching a device.
 
-The user-supplied circuit reference is shown in the app's Circuit Reference tab and in the repository README. It is an unverified drawing; use the firmware pin map and device datasheet for wiring, and independently verify VPP before connecting a target.
+The app displays the user-supplied diagrams.net XML as an image in the single Circuit Reference view, with a board/PIC-specific firmware connection table below it. The drawing is an unverified reference and may not match that table. Check the exact datasheet and hardware guide before wiring; independently verify VPP before connecting a target. Zoom using the controls or Ctrl+mouse wheel; the editable source can be opened from the same view.
 
 For a PIC16F84A in the published ZIF shield, JP3 is commonly set to 1-2; an 8-pin PIC such as PIC12F675 may require JP3=2-3. Confirm the exact board schematic before selecting jumper positions.
 

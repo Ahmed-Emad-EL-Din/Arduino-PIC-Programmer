@@ -22,6 +22,38 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 
 Local results: `PYTHONPATH=.:src .venv/bin/pytest -q src/tests --ignore=src/tests/test_gui.py` passed (42 tests, 29 subtests); `compileall`, workflow YAML parsing, and `git diff --check` passed. Windows run `46047111968` passed the full GUI suite, all `winapp ui` accessible-control searches, package validation, installer smoke test, and checksum/ZIP creation. Earlier runs exposed stale GUI assertions and a PATH precedence issue; both were fixed before this passing run.
 
+## Current follow-up — simplify the workbench and display the circuit source
+
+### Phase 1 — Reduce top-level clutter
+- [x] Remove the duplicate quick-action toolbar; keep the existing menus and task-card actions.
+- [x] Keep only programmer connection and PIC target status chips; board and HEX state remain in their task cards.
+- [x] Replace the multiple wiring/pinout/HEX tabs with a single Circuit Reference view.
+
+### Phase 2 — Put the reference and selected wiring together
+- [x] Render `assets/reference/user-circuit-diagram.drawio` offline as an SVG image inside the app, including embedded artwork, labels, and connection lines.
+- [x] Add zoom/fit controls and an Open Editable Source action; keep the unverified-source/VPP safety warning visible.
+- [x] Place the board/PIC-specific firmware connection table directly below the image and explicitly distinguish it from the user-supplied drawing.
+
+### Phase 3 — Regression checks and documentation
+- [x] Add XML-to-SVG renderer tests, update GUI assertions for the one-view/compact-header layout, and add UI Automation searches for the view and connection table.
+- [x] Update README and user-guide wording for the inline circuit display and contextual connection table.
+- [x] Run 18 available pure-Python unit tests, `compileall`, and `git diff --check` successfully.
+- [ ] Run the PySide6 GUI suite and Windows packaged-app smoke/UI Automation checks; the current local environment has no PySide6 installation.
+
+## Current follow-up — refresh the app icon from the supplied Drive artwork
+
+### Phase 1 — Icon adaptation
+- [x] Inspect the supplied Drive image and simplify it into a text-free, square icon with transparent outside corners and stronger small-size contrast.
+- [x] Preserve the Arduino loop and PIC-chip identity in the selected icon design.
+
+### Phase 2 — App asset integration
+- [x] Replace the app PNG, SVG source, and multi-resolution Windows ICO at `assets/app-icon.*` so the desktop app, installer, and executable use the refreshed icon.
+- [x] Keep the existing app/package references to `assets/app-icon.ico` intact.
+
+### Phase 3 — Delivery and checks
+- [x] Upload the refined PNG as a separate Google Drive file, leaving the original Drive image unchanged.
+- [x] Validate the SVG XML and ICO/PNG dimensions/alpha; inspect the 16px and 48px ICO renderings.
+
 ## Goal and release definition
 
 - Deliver a portable Windows 10/11 x64 package that a user can extract and launch by double-clicking `Arduino-PIC-Programmer.exe`, without installing Python or separately downloading runtime dependencies.
