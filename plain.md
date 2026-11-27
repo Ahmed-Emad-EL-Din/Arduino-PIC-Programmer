@@ -18,9 +18,9 @@ This is the execution checklist for producing a complete, safe, reproducible Win
 ### Phase 3 — Verification
 - [x] Run pure-Python/theme and non-GUI regression tests plus compile/whitespace checks locally.
 - [x] Run full GUI and `winapp ui` checks on Windows CI; record failures/limits rather than marking unverified work complete.
-- [ ] Review PR checks and update this phase checklist with actual outcomes.
+- [x] Review PR checks and update this phase checklist with actual outcomes.
 
-Local results: `PYTHONPATH=.:src .venv/bin/pytest -q src/tests --ignore=src/tests/test_gui.py` passed (42 tests, 29 subtests); `compileall`, workflow YAML parsing, and `git diff --check` passed. Windows run `46046478573` passed the GUI suite and all `winapp ui` accessible-control searches. The later ZIP step failed because adding the WindowsApps directory ahead of Python in `PATH` shadowed `setup-python`; the workflow now adds only WinGet's links directory. Earlier Windows runs exposed stale GUI assertions and an incomplete HEX fixture; those are corrected.
+Local results: `PYTHONPATH=.:src .venv/bin/pytest -q src/tests --ignore=src/tests/test_gui.py` passed (42 tests, 29 subtests); `compileall`, workflow YAML parsing, and `git diff --check` passed. Windows run `46047111968` passed the full GUI suite, all `winapp ui` accessible-control searches, package validation, installer smoke test, and checksum/ZIP creation. Earlier runs exposed stale GUI assertions and a PATH precedence issue; both were fixed before this passing run.
 
 ## Goal and release definition
 
