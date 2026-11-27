@@ -5,9 +5,9 @@
 
 ---
 
-## Status: candidate build, not a validated release
+## Status: downloadable software candidate, not hardware-validated
 
-The prior Windows workflow passed, but it predates the new installer packaging; the updated workflow has not yet been run. See the README for the artifact instructions once it succeeds. No validated GitHub Release or physical hardware acceptance is available. Treat these steps as candidate behavior, not proof that programming is ready for use; do not perform destructive programming with an unvalidated build.
+The Windows build compiles the firmware and smoke-tests installation, launch, and uninstall. The installer is published on the GitHub Releases page, but no physical Arduino/PIC hardware acceptance or clean-machine validation has been completed. Treat this as a software candidate, not proof that programming is ready for use; do not perform destructive programming with an unvalidated build.
 
 ## 1. Hardware you need
 
@@ -31,9 +31,9 @@ For a PIC16F84A in the published ZIF shield, JP3 is commonly set to 1-2; an 8-pi
 ## 2. First-time setup (once)
 
 ### Step 1 — Install the Windows candidate
-1. After the updated Windows workflow succeeds, open that run from the README's workflow link and download **Arduino-PIC-Programmer-Windows-x64-installer**. Earlier runs may use the old combined artifact name.
-2. Extract the artifact ZIP. Verify `Arduino-PIC-Programmer-Setup-x64.exe` against its `.sha256` sidecar before installing.
-3. Run Setup. It installs per-user, adds a Start menu shortcut, registers in Windows Installed Apps, and includes an uninstaller. This is still a temporary candidate—not a validated hardware release.
+1. Open the project's [GitHub Releases page](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases) and download the latest Windows installer or installer-only ZIP, plus its `.sha256` sidecar.
+2. Verify `Arduino-PIC-Programmer-Setup-x64.exe` against its checksum before installing.
+3. Run Setup. It installs per-user, adds a Start menu shortcut, registers in Windows Installed Apps, and includes an uninstaller. The release remains a software candidate—not a hardware-validated release.
 4. SmartScreen can warn on unsigned or not-yet-reputed apps. Do not disable it or bypass it for an unvalidated candidate; see the README's SmartScreen note.
 
 ### Step 2 — Install ProgramPic firmware if needed
