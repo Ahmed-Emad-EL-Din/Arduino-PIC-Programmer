@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox,
-                               QFormLayout, QSpinBox, QVBoxLayout)
+                               QFormLayout, QLabel, QVBoxLayout)
 from core.avrdude import BOARDS
+from core.serial_config import PROGRAMMER_BAUD
 
 
 class SettingsDialog(QDialog):
@@ -38,11 +39,13 @@ class SettingsDialog(QDialog):
             self.mcu.addItem(dev.display_name, dev.name)
         self.mcu.setCurrentIndex(max(0, self.mcu.findData(settings.mcu)))
         form.addRow("Default target:", self.mcu)
-        self.baud = QSpinBox()
-        self.baud.setRange(9600, 1000000)
-        self.baud.setValue(settings.baud)
-        self.baud.setToolTip("ProgramPic serial link. Default: 9600 baud.")
-        form.addRow("Serial speed:", self.baud)
+        self.baud = QLabel(f"{PROGRAMMER_BAUD} baud (required by ProgramPic)")
+        self.baud.setAccessibleName("ProgramPic runtime serial speed")
+        self.baud.setToolTip(
+            "Fixed at 9600 baud by the bundled ProgramPic firmware. "
+            "Arduino bootloader upload speed is configured separately."
+        )
+        form.addRow("ProgramPic link:", self.baud)
         self.verify = QCheckBox("Read back and compare after programming")
         self.verify.setChecked(settings.auto_verify)
         self.verify.setToolTip("When off, a completed write is not evidence that the target stored the data correctly.")
@@ -66,7 +69,6 @@ class SettingsDialog(QDialog):
         self.settings.theme = self.theme.currentData()
         self.settings.board_key = self.board.currentData()
         self.settings.mcu = self.mcu.currentData()
-        self.settings.baud = self.baud.value()
         self.settings.auto_verify = self.verify.isChecked()
         self.settings.confirm_erase = self.confirm.isChecked()
         self.settings.log_visible = self.log_visible.isChecked()

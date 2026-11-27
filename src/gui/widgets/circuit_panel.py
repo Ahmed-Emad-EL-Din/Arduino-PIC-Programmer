@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QSplitter,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -58,8 +59,7 @@ class ZoomableImageView(QScrollArea):
         self._drag_pos: Optional[QPoint] = None
         self._canvas = _ImageCanvas(self._image, self)
         self.setWidget(self._canvas)
-        self.setMinimumHeight(220)
-        self.setMaximumHeight(300)
+        self.setMinimumHeight(150)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
     def set_image(self, image_bytes: bytes) -> None:
@@ -214,44 +214,59 @@ class CircuitPanel(QWidget):
 
     def _build_reference_tab(self) -> None:
         page = QWidget()
+        page.setObjectName("circuitReferencePage")
         page_layout = QVBoxLayout(page)
         page_layout.setContentsMargins(8, 8, 8, 8)
-        page_layout.setSpacing(6)
+        page_layout.setSpacing(8)
 
-        self.reference_notice = QLabel(
-            "Unverified example circuit for PIC16F84A only; it shows a 24 V input and LM317. It may not match firmware wiring. Verify your hardware and VPP supply; never connect VPP to an Arduino pin or apply 24 V to a shield unless its documentation permits it."
-        )
-        self.reference_notice.setObjectName("guidance")
-        self.reference_notice.setAccessibleName("Circuit reference safety warning")
-        self.reference_notice.setWordWrap(True)
-        page_layout.addWidget(self.reference_notice)
+        self.reference_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.reference_splitter.setObjectName("referenceAndConnectionsSplitter")
+        self.reference_splitter.setHandleWidth(8)
+        self.reference_splitter.setChildrenCollapsible(False)
+
+        self.reference_card = QFrame()
+        self.reference_card.setObjectName("referenceCard")
+        reference_layout = QVBoxLayout(self.reference_card)
+        reference_layout.setContentsMargins(12, 10, 12, 10)
+        reference_layout.setSpacing(8)
 
         controls = QHBoxLayout()
         controls.setSpacing(6)
-        title = QLabel("Example circuit for PIC16F84A")
-        title.setObjectName("sectionLabel")
+        title = QLabel("Example circuit · PIC16F84A")
+        title.setObjectName("cardTitle")
         controls.addWidget(title, 1)
         self.btn_zoom_out = QPushButton("−")
         self.btn_zoom_out.setAccessibleName("Zoom circuit diagram out")
         self.btn_zoom_out.setToolTip("Zoom out (Ctrl+mouse wheel also works)")
         self.btn_fit = QPushButton("Fit")
         self.btn_fit.setAccessibleName("Fit circuit diagram to view")
+        self.btn_fit.setToolTip("Fit the complete drawing in the available panel")
         self.btn_zoom_in = QPushButton("+")
         self.btn_zoom_in.setAccessibleName("Zoom circuit diagram in")
         self.btn_zoom_in.setToolTip("Zoom in (Ctrl+mouse wheel also works)")
         for button in (self.btn_zoom_out, self.btn_fit, self.btn_zoom_in):
-            button.setFixedSize(42, 28)
+            button.setFixedSize(42, 32)
             controls.addWidget(button)
-        self.btn_open_source = QPushButton("Open image file")
-        self.btn_open_source.setAccessibleName("Open supplied circuit reference image")
-        self.btn_open_source.setToolTip("Open the supplied PNG circuit reference image")
+        self.btn_open_source = QPushButton("Open original PNG")
+        self.btn_open_source.setAccessibleName("Open original supplied circuit PNG")
+        self.btn_open_source.setToolTip("Open the exact supplied PNG file outside the app")
         controls.addWidget(self.btn_open_source)
-        page_layout.addLayout(controls)
+        reference_layout.addLayout(controls)
+
+        self.reference_notice = QLabel(
+            "Illustration only—not wiring instructions. The supplied PIC16F84A example shows 24 V input and an LM317. "
+            "It is unverified and may not match the selected board. Never connect VPP to an Arduino pin; "
+            "do not apply 24 V to a shield unless its documentation permits it."
+        )
+        self.reference_notice.setObjectName("guidanceWarn")
+        self.reference_notice.setAccessibleName("Unverified PIC16F84A example circuit safety notice")
+        self.reference_notice.setWordWrap(True)
+        reference_layout.addWidget(self.reference_notice)
 
         self.reference_view = ZoomableImageView()
         self.reference_view.setAccessibleName("PIC16F84A example circuit image")
         self.reference_view.setAccessibleDescription(
-            "User-supplied, unverified example circuit for PIC16F84A. It is separate from the selected board/PIC firmware wiring table."
+            "Exact user-supplied, unverified example circuit for PIC16F84A. It is not the selected board's wiring map."
         )
         image_file = _assets_reference_dir() / "circuit-reference.png"
         self.btn_open_source.setEnabled(image_file.is_file())
@@ -273,49 +288,65 @@ class CircuitPanel(QWidget):
             self.reference_notice.setText(
                 "The supplied circuit image is missing. Check the datasheet and hardware guide before wiring."
             )
-        page_layout.addWidget(self.reference_view, 3)
+        reference_layout.addWidget(self.reference_view, 1)
+        self.reference_splitter.addWidget(self.reference_card)
 
-        table_title = QLabel("Point-to-point connections for the selected board and PIC")
-        table_title.setObjectName("sectionLabel")
-        page_layout.addWidget(table_title)
+        self.connections_card = QFrame()
+        self.connections_card.setObjectName("referenceCard")
+        connections_layout = QVBoxLayout(self.connections_card)
+        connections_layout.setContentsMargins(12, 10, 12, 10)
+        connections_layout.setSpacing(6)
+
+        heading = QHBoxLayout()
+        heading.setSpacing(8)
+        table_title = QLabel("Point-to-point connections")
+        table_title.setObjectName("cardTitle")
+        heading.addWidget(table_title, 1)
+        self.connection_count = QLabel()
+        self.connection_count.setObjectName("modeBadge")
+        self.connection_count.setAccessibleName("Connection row count")
+        heading.addWidget(self.connection_count)
+        connections_layout.addLayout(heading)
+
         self.table_note = QLabel(
-            "Firmware map for the selected board and PIC only. The drawing above is an example for PIC16F84A and may not match other selections."
+            "From → To for the selected firmware profile. This table and the example drawing are separate references; verify actual wiring against the board documentation and PIC datasheet."
         )
         self.table_note.setObjectName("muted")
         self.table_note.setWordWrap(True)
-        page_layout.addWidget(self.table_note)
+        connections_layout.addWidget(self.table_note)
 
         self.wiring_table = QTableWidget(0, 4)
         self.wiring_table.setObjectName("wiringTable")
         self.wiring_table.setAccessibleName("Point-to-point hardware connections")
         self.wiring_table.setAccessibleDescription(
-            "Connections for the selected Arduino board and PIC target; verify them before wiring."
+            "Selected firmware profile, shown as signal and source-to-target connections. Not cross-validated against the example drawing. Verify each connection before wiring."
         )
         self.wiring_table.setHorizontalHeaderLabels(
-            ["Signal", "Arduino / Shield Source", "Target PIC Pin(s)", "Hardware Notes"]
+            ["Signal", "From · board / shield", "To · PIC pin(s)", "Notes / constraints"]
         )
         self.wiring_table.verticalHeader().setVisible(False)
         self.wiring_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.wiring_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.wiring_table.setAlternatingRowColors(True)
         self.wiring_table.setWordWrap(True)
+        self.wiring_table.setMinimumHeight(120)
+        self.wiring_table.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         header = self.wiring_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        self.wiring_table.setMinimumHeight(140)
-        self.wiring_table.setMaximumHeight(220)
-        page_layout.addWidget(self.wiring_table, 2)
+        header.setMinimumSectionSize(84)
+        connections_layout.addWidget(self.wiring_table, 1)
+        self.reference_splitter.addWidget(self.connections_card)
+        self.reference_splitter.setStretchFactor(0, 3)
+        self.reference_splitter.setStretchFactor(1, 2)
+        self.reference_splitter.setSizes([500, 340])
+        page_layout.addWidget(self.reference_splitter, 1)
 
-        content = QWidget()
-        content.setLayout(page_layout)
-        scroll = QScrollArea()
-        scroll.setObjectName("circuitReferenceScroll")
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setWidget(content)
-        self.tabs.addTab(scroll, "Circuit Reference")
+        self.tabs.addTab(page, "Circuit Reference")
 
     def set_context(
         self,
@@ -363,6 +394,14 @@ class CircuitPanel(QWidget):
             )
 
         rows = build_wiring_rows(self._board_key, device.name)
+        self.connection_count.setText(f"{len(rows)} connections")
+        self.connection_count.setAccessibleDescription(
+            f"{len(rows)} point-to-point connection rows for the selected profile"
+        )
+        self.table_note.setText(
+            f"From → To for the {board.board_name} → {device.display_name} firmware profile. "
+            "This table and the PIC16F84A example drawing are separate references; verify actual wiring against board documentation and the PIC datasheet."
+        )
         self.wiring_table.setRowCount(len(rows))
         for row_index, (signal, source, target, note) in enumerate(rows):
             for column, value in enumerate((signal, source, target, note)):

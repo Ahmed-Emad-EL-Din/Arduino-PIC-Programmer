@@ -128,13 +128,21 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertTrue(self.win.target_tools_panel.isVisible())
         self.assertEqual(self.win.btn_more_target.accessibleName(), "Hide more target actions")
 
-    def test_circuit_reference_is_the_only_diagram_and_table_follows_it(self):
+    def test_circuit_reference_and_point_to_point_table_have_resizable_sections(self):
         panel = self.win.circuit_panel
         self.assertEqual(panel.tabs.count(), 1)
         self.assertEqual(panel.tabs.tabText(0), "Circuit Reference")
         self.assertFalse(panel.reference_view.image.isNull())
         self.assertGreater(panel.wiring_table.rowCount(), 0)
         self.assertEqual(panel.wiring_table.accessibleName(), "Point-to-point hardware connections")
+        self.assertEqual(panel.reference_splitter.count(), 2)
+        self.assertGreater(panel.reference_view.maximumHeight(), 300)
+        self.assertIn("PIC16F84A example drawing", panel.table_note.text())
+        self.assertEqual(
+            [panel.wiring_table.horizontalHeaderItem(i).text() for i in range(4)],
+            ["Signal", "From · board / shield", "To · PIC pin(s)", "Notes / constraints"],
+        )
+        self.assertIn("connections", panel.connection_count.text())
         panel.reference_view.zoom_in()
         panel.reference_view.zoom_fit()
 
@@ -325,12 +333,14 @@ class TestGUIIntegration(unittest.TestCase):
         dlg_flash = FlashArduinoDialog(self.win.settings, self.win.lane, self.win)
         dlg_flash.close()
 
+        dlg_set = SettingsDialog(self.win.settings, self.win)
+        self.assertEqual(dlg_set.baud.text(), "9600 baud (required by ProgramPic)")
+        self.assertIn("fixed at 9600 baud", dlg_set.baud.toolTip().lower())
+        dlg_set.close()
+
         items = build_dynamic_preflight(lookup("pic12f675"), "nano_new")
         dlg_pre = PreflightDialog(items, "Hardware Safety Checklist — PIC12F675", "Arduino Nano -> ZIF-18 JP3=2-3", self.win)
         dlg_pre.close()
-
-        dlg_set = SettingsDialog(self.win.settings, self.win)
-        dlg_set.close()
 
         dlg_about = AboutDialog(self.win)
         dlg_about.close()

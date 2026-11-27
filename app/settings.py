@@ -4,23 +4,19 @@ from __future__ import annotations
 from PySide6.QtCore import QByteArray, QSettings
 
 from app import APP_NAME, ORG_NAME
+from core.serial_config import PROGRAMMER_BAUD
 
 
 class AppSettings:
     def __init__(self) -> None:
         self._settings = QSettings(ORG_NAME, APP_NAME)
         self._settings.beginGroup("workbench")
-        # ProgramPic firmware and host now default to 9600 baud. Normalize the
-        # previous known defaults once while preserving custom serial speeds.
-        if not self._settings.value("baud_9600_migrated", False, type=bool):
-            try:
-                old_baud = int(self._settings.value("baud", 9600))
-            except (TypeError, ValueError):
-                old_baud = 9600
-            if old_baud in (9600, 57600, 115200):
-                self._settings.setValue("baud", 9600)
-            self._settings.setValue("baud_9600_migrated", True)
-            self._settings.sync()
+        # ProgramPic firmware initializes its runtime link at a fixed 9600 baud.
+        # Normalize persisted values every launch so stale/custom settings cannot
+        # silently make the host open the port at the bootloader's upload rate.
+        self._settings.setValue("baud", PROGRAMMER_BAUD)
+        self._settings.setValue("baud_9600_migrated", True)
+        self._settings.sync()
 
     def _get(self, key, default):
         return self._settings.value(key, default)
@@ -73,14 +69,13 @@ class AppSettings:
 
     @property
     def baud(self) -> int:
-        try:
-            return int(self._get("baud", 9600))
-        except (TypeError, ValueError):
-            return 9600
+        return PROGRAMMER_BAUD
 
     @baud.setter
-    def baud(self, value: int) -> None:
-        self._settings.setValue("baud", int(value))
+    def baud(self, _value: int) -> None:
+        # Keep compatibility with settings callers while refusing a value the
+        # firmware does not support on its runtime serial link.
+        self._settings.setValue("baud", PROGRAMMER_BAUD)
 
     @property
     def auto_verify(self) -> bool:

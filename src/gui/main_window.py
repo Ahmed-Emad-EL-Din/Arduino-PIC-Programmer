@@ -49,6 +49,7 @@ from core.mcu_db import DEFAULT_DEVICE, McuDevice, all_devices, find_by_id, look
 from core.pinout_db import MODE_ZIF_8, MODE_ZIF_18, get_board_wiring, get_pic_wiring
 from core.programmer import ProgrammerSession
 from core.safety import analyze_hex_for_device, build_summary
+from core.serial_config import PROGRAMMER_BAUD
 from core.serial_link import list_serial_ports
 from .dialogs.about import AboutDialog
 from .dialogs.flash_arduino import FlashArduinoDialog
@@ -1356,11 +1357,12 @@ class MainWindow(QMainWindow):
                 "Plug in your Arduino programmer and select its serial port first.",
             )
             return
-        baud = self.settings.baud
         self.settings.port = port
 
         def task(progress, _pct, _cancel):
-            return self.session.connect(port=port, baud=baud, progress=progress)
+            return self.session.connect(
+                port=port, baud=PROGRAMMER_BAUD, progress=progress
+            )
 
         def ok(st) -> None:
             self._reported_target_name = None
