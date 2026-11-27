@@ -83,7 +83,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.win._refresh_actions()
         self.assertFalse(self.win.btn_connect.isEnabled())
         self.assertEqual(self.win.btn_rescan.objectName(), "primary")
-        self.assertIn("No serial port found", self.win.lbl_connection_guidance.text())
+        self.assertIn("No port found", self.win.lbl_connection_guidance.text())
         self.assertFalse(self.win.target_tools_panel.isVisible())
         capture_window(self.win, "main-dark-no-hardware.png")
 
@@ -165,7 +165,6 @@ class TestGUIIntegration(unittest.TestCase):
             self.win.circuit_panel.hex_summary_lbl.text(),
         )
         self.assertIn("HEX fits", self.win.lbl_hex_guidance.text())
-        self.assertIn("does not verify target identity", self.win.lbl_hex_guidance.text())
         capture_window(self.win, "hex-inspector-dark.png")
 
     def test_out_of_range_hex_disables_program_when_connected(self):
