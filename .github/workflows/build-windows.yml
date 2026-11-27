@@ -226,9 +226,9 @@ jobs:
             --silent --accept-source-agreements --accept-package-agreements
           if ($LASTEXITCODE -ne 0) { throw 'Could not install the pinned WinApp CLI 0.7.1.' }
           $WinGetLinks = Join-Path $env:LOCALAPPDATA 'Microsoft/WinGet/Links'
-          $WindowsApps = Join-Path $env:LOCALAPPDATA 'Microsoft/WindowsApps'
-          foreach ($Path in @($WinGetLinks, $WindowsApps)) {
-            if (Test-Path $Path) { $Path | Add-Content $env:GITHUB_PATH; $env:PATH = "$Path;$env:PATH" }
+          if (Test-Path $WinGetLinks) {
+            $WinGetLinks | Add-Content $env:GITHUB_PATH
+            $env:PATH = "$WinGetLinks;$env:PATH"
           }
           if (!(Get-Command winapp -ErrorAction SilentlyContinue)) {
             throw 'WinApp CLI installed but winapp.exe is not on PATH.'
