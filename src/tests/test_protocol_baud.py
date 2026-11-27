@@ -39,3 +39,15 @@ def test_program_pic_wiring_profile_matches_pic16f84a_shield_connection():
     assert entry.index("digitalWrite(PIN_MCLR, MCLR_RESET)") < entry.index("digitalWrite(PIN_VDD, LOW)")
     assert entry.index("digitalWrite(PIN_MCLR, MCLR_VPP)") < entry.index("digitalWrite(PIN_VDD, HIGH)")
     assert "digitalWrite(PIN_MCLR, MCLR_RESET);" in firmware.split("void exitProgramMode()", 1)[1]
+
+
+def test_icsp_write_bits_are_set_up_before_the_rising_clock_edge():
+    firmware = (ROOT / "firmware/source/ProgramPic/ProgramPic.ino").read_text(encoding="utf-8")
+
+    send_command = firmware.split("void sendCommand(byte cmd)", 1)[1].split("void sendSimpleCommand", 1)[0]
+    send_write = firmware.split("void sendWriteCommand(byte cmd, unsigned int data)", 1)[1].split("void sendReadCommand", 1)[0]
+    for routine in (send_command, send_write):
+        data_set = routine.index("digitalWrite(PIN_DATA,")
+        setup_delay = routine.index("delayMicroseconds(DELAY_TSET1)")
+        rising_edge = routine.index("digitalWrite(PIN_CLOCK, HIGH)")
+        assert data_set < setup_delay < rising_edge

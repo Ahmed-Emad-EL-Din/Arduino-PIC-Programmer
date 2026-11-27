@@ -1175,14 +1175,14 @@ void exitProgramMode() {
 // Send a command to the PIC.
 void sendCommand(byte cmd) {
     for (byte bit = 0; bit < 6; ++bit) {
-        digitalWrite(PIN_CLOCK, HIGH);
-        if (cmd & 1)
-            digitalWrite(PIN_DATA, HIGH);
-        else
-            digitalWrite(PIN_DATA, LOW);
+        // ICSP samples DATA on the rising CLOCK edge. Set the bit first,
+        // then meet the data setup time before pulsing CLOCK high.
+        digitalWrite(PIN_DATA, (cmd & 1) ? HIGH : LOW);
         delayMicroseconds(DELAY_TSET1);
-        digitalWrite(PIN_CLOCK, LOW);
+        digitalWrite(PIN_CLOCK, HIGH);
         delayMicroseconds(DELAY_THLD1);
+        digitalWrite(PIN_CLOCK, LOW);
+        delayMicroseconds(DELAY_TDLY2);
         cmd >>= 1;
     }
 }
@@ -1200,14 +1200,14 @@ void sendWriteCommand(byte cmd, unsigned int data) {
     sendCommand(cmd);
     delayMicroseconds(DELAY_TDLY2);
     for (byte bit = 0; bit < 16; ++bit) {
-        digitalWrite(PIN_CLOCK, HIGH);
-        if (data & 1)
-            digitalWrite(PIN_DATA, HIGH);
-        else
-            digitalWrite(PIN_DATA, LOW);
+        // The low-order bit is the start bit; set every payload bit before
+        // its rising CLOCK edge so the PIC sees it within the setup window.
+        digitalWrite(PIN_DATA, (data & 1) ? HIGH : LOW);
         delayMicroseconds(DELAY_TSET1);
-        digitalWrite(PIN_CLOCK, LOW);
+        digitalWrite(PIN_CLOCK, HIGH);
         delayMicroseconds(DELAY_THLD1);
+        digitalWrite(PIN_CLOCK, LOW);
+        delayMicroseconds(DELAY_TDLY2);
         data >>= 1;
     }
     delayMicroseconds(DELAY_TDLY2);
