@@ -28,9 +28,10 @@ try {
         'Open HEX file',
         'Program PIC from selected HEX file',
         'Operation status',
-        'Circuit reference',
-        'Point-to-point hardware connections'
+        'Circuit reference'
     )
+    $WiringTabName = 'Point-to-Point Wiring'
+    $WiringTableName = 'Point-to-point hardware connections'
 
     # Give the packaged app one bounded startup window, then check every required
     # control by its accessible name using the skill's cross-framework UIA search.
@@ -57,6 +58,27 @@ try {
         }
         Write-Output "UIA found: $Name"
     }
+
+    # The wiring table is intentionally on a separate tab, so activate that
+    # tab before searching for its controls in the UI Automation tree.
+    $Output = (& winapp ui invoke $WiringTabName -a "$($AppProcess.Id)" 2>&1 | Out-String)
+    if ($LASTEXITCODE -ne 0) {
+        throw "UI Automation could not activate '$WiringTabName'. Result: $Output"
+    }
+    $WiringReady = $false
+    $WiringDeadline = (Get-Date).AddSeconds(5)
+    do {
+        $Output = (& winapp ui search $WiringTableName -a "$($AppProcess.Id)" 2>&1 | Out-String)
+        if ($LASTEXITCODE -eq 0 -and $Output -match [regex]::Escape($WiringTableName)) {
+            $WiringReady = $true
+            break
+        }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $WiringDeadline)
+    if (!$WiringReady) {
+        throw "UI Automation could not find '$WiringTableName' after activating the wiring tab. Result: $Output"
+    }
+    Write-Output "UIA found: $WiringTableName"
 }
 finally {
     if (!$AppProcess.HasExited) {
