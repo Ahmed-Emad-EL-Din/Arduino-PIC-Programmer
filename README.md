@@ -28,7 +28,7 @@ Tagged Windows builds run the test suite, compile the firmware, build the app, v
 - Opens, inspects, and exports Intel HEX data, with target-memory checks and read-back verification.
 - Supports guarded connect, detect, program, erase, read, and verify workflows, with a preflight checklist and confirmation for destructive operations.
 - Provides a board/PIC connection table, HEX memory inspector, activity log, themes, and editable firmware source.
-- Displays the supplied circuit image in the **Circuit Reference** view. Its board/PIC firmware table is separate from the drawing and is not an electrical validation of it.
+- Shows the exact supplied circuit image in the app and below as an **unverified example circuit for PIC16F84A**. The selected board/PIC firmware connection table is separate and may not match the example.
 
 See the [User Guide](docs/USER_GUIDE.md) for the application workflow and board-specific notes.
 
@@ -38,7 +38,11 @@ Use only a programmer circuit and supply that are documented for your exact hard
 
 The bundled ProgramPic firmware communicates with the app at **9600 baud**. This is separate from Arduino bootloader upload speed. The Nano hardware profile uses D2 for switched target VDD, A1 as a **low-voltage VPP-switch control**, D4 for PGC/clock, D7 for bidirectional PGD/data, and A5 for the activity LED. A1 does not generate or tolerate programming voltage: **never connect VPP directly to A1 or any Arduino GPIO**. The external switching circuit must route VPP to MCLR/VPP. Join grounds as required by the verified hardware and place the target's required decoupling capacitor (typically 100 nF) between VDD and VSS.
 
-The [user-supplied circuit image](assets/reference/circuit-reference.png) is an **unverified reference**, not a validated schematic or wiring instruction. It depicts a 24 V DC input and an LM317 regulator; it may not match the firmware pin map or the actual programmer. The project guide describes a 16–20 V input for the official shield—do not apply the image's 24 V input to that shield unless its own documentation explicitly permits it. Do not wire or power hardware from the image or app connection table alone. Verify the specific VPP circuit, voltage, polarity, and target limits independently.
+### Example circuit for PIC16F84A
+
+![User-supplied example circuit for PIC16F84A](assets/reference/circuit-reference.png)
+
+This is the exact user-supplied PNG displayed in the app. It is an **unverified example for PIC16F84A**, not a validated schematic or wiring instruction. It depicts a 24 V DC input and an LM317 regulator with a marked 13 V output; it may not match the firmware pin map or the actual programmer. The project guide describes a 16–20 V input for the official shield—do not apply the image's 24 V input to that shield unless its own documentation explicitly permits it. The image and the selected board/PIC firmware table are separate references; neither certifies the other. Verify the exact circuit, VPP voltage and polarity, target package, and datasheet independently before applying power.
 
 The application does not measure socket voltage. The upstream host does not expose raw silicon ID/configuration values to the UI, and a manual selection cannot electronically identify devices that have no silicon ID. A green connection state or successful software check is not proof that the target wiring or voltage is safe.
 

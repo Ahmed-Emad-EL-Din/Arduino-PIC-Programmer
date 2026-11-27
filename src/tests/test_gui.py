@@ -374,12 +374,20 @@ class TestGUIIntegration(unittest.TestCase):
         image_bytes = reference.image_bytes
         self.assertTrue(image_bytes.startswith(b"\x89PNG\r\n\x1a\n"))
         self.assertEqual(reference.image.width(), 3570)
+        self.assertEqual(reference.image.height(), 2978)
+        self.assertIn("PIC16F84A", self.win.circuit_panel.reference_notice.text())
+        self.assertIn("unverified", self.win.circuit_panel.reference_notice.text().lower())
+        root = Path(__file__).resolve().parents[2]
         self.assertEqual(
             image_bytes,
-            (Path(__file__).resolve().parents[2] / "assets" / "reference" / "circuit-reference.png").read_bytes(),
+            (root / "assets" / "reference" / "circuit-reference.png").read_bytes(),
+        )
+        readme = (root / "README.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "![User-supplied example circuit for PIC16F84A](assets/reference/circuit-reference.png)",
+            readme,
         )
         self.assertFalse(reference.image.isNull())
-        self.assertIn("unverified", self.win.circuit_panel.reference_notice.text().lower())
 
 if __name__ == "__main__":
     unittest.main()
