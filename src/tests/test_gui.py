@@ -380,7 +380,7 @@ class TestGUIIntegration(unittest.TestCase):
             self.win.btn_verify: "Verify PIC against selected HEX file",
             self.win.status_lbl: "Operation status",
             self.win.progress: "Operation progress",
-            self.win.circuit_panel.tabs: "Circuit reference and wiring",
+            self.win.circuit_panel.tabs: "Circuit reference",
         }
         for widget, name in expected.items():
             with self.subTest(name=name):

@@ -206,7 +206,7 @@ class CircuitPanel(QWidget):
 
         self.tabs = QTabWidget()
         self.tabs.setObjectName("inspectorTabs")
-        self.tabs.setAccessibleName("Circuit reference and wiring")
+        self.tabs.setAccessibleName("Circuit reference")
         self._build_reference_tab()
         self._build_connections_tab()
         root.addWidget(self.tabs, 1)
