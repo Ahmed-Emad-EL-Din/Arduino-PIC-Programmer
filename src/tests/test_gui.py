@@ -65,8 +65,9 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertFalse(self.win.brand_icon.pixmap().isNull())
         self.assertFalse(self.win.log_dock.isVisible())
         self.assertIsNone(self.win.findChild(QToolBar, "mainToolbar"))
-        self.assertEqual(self.win.circuit_panel.tabs.count(), 1)
+        self.assertEqual(self.win.circuit_panel.tabs.count(), 2)
         self.assertEqual(self.win.circuit_panel.tabs.tabText(0), "Circuit Reference")
+        self.assertEqual(self.win.circuit_panel.tabs.tabText(1), "Point-to-Point Wiring")
         self.assertFalse(self.win.circuit_panel.reference_view.image.isNull())
         self.assertFalse(self.win.progress.isVisible())
         self.assertFalse(self.win.btn_cancel.isVisible())
@@ -128,21 +129,31 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertTrue(self.win.target_tools_panel.isVisible())
         self.assertEqual(self.win.btn_more_target.accessibleName(), "Hide more target actions")
 
-    def test_circuit_reference_and_point_to_point_table_have_resizable_sections(self):
+    def test_circuit_reference_and_point_to_point_wiring_are_separate_tabs(self):
         panel = self.win.circuit_panel
-        self.assertEqual(panel.tabs.count(), 1)
+        self.assertEqual(panel.tabs.count(), 2)
         self.assertEqual(panel.tabs.tabText(0), "Circuit Reference")
+        self.assertEqual(panel.tabs.tabText(1), "Point-to-Point Wiring")
+        self.assertTrue(panel.reference_page.isAncestorOf(panel.reference_view))
+        self.assertTrue(panel.connections_page.isAncestorOf(panel.wiring_table))
+        self.assertFalse(panel.connections_page.isAncestorOf(panel.reference_view))
         self.assertFalse(panel.reference_view.image.isNull())
         self.assertGreater(panel.wiring_table.rowCount(), 0)
         self.assertEqual(panel.wiring_table.accessibleName(), "Point-to-point hardware connections")
-        self.assertEqual(panel.reference_splitter.count(), 2)
         self.assertGreater(panel.reference_view.maximumHeight(), 300)
+        self.assertIn("may not match", panel.wiring_notice.text())
         self.assertIn("PIC16F84A example drawing", panel.table_note.text())
         self.assertEqual(
             [panel.wiring_table.horizontalHeaderItem(i).text() for i in range(4)],
             ["Signal", "From · board / shield", "To · PIC pin(s)", "Notes / constraints"],
         )
         self.assertIn("connections", panel.connection_count.text())
+        panel.tabs.setCurrentIndex(0)
+        capture_window(self.win, "circuit-reference-tab.png")
+        panel.tabs.setCurrentIndex(1)
+        self.assertEqual(panel.tabs.currentWidget(), panel.connections_page)
+        capture_window(self.win, "point-to-point-wiring-tab.png")
+        panel.tabs.setCurrentIndex(0)
         panel.reference_view.zoom_in()
         panel.reference_view.zoom_fit()
 
@@ -369,7 +380,7 @@ class TestGUIIntegration(unittest.TestCase):
             self.win.btn_verify: "Verify PIC against selected HEX file",
             self.win.status_lbl: "Operation status",
             self.win.progress: "Operation progress",
-            self.win.circuit_panel.tabs: "Circuit reference",
+            self.win.circuit_panel.tabs: "Circuit reference and wiring",
         }
         for widget, name in expected.items():
             with self.subTest(name=name):
