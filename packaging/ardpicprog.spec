@@ -23,7 +23,7 @@ for path, destination in (
     (ROOT / "docs" / "USER_GUIDE.md", "docs"),
     (ROOT / "firmware" / "source" / "ProgramPic" / "ProgramPic.ino", "firmware/source/ProgramPic"),
     (ROOT / "assets" / "app-icon.ico", "assets"),
-    (ROOT / "assets" / "reference" / "user-circuit-diagram.drawio", "assets/reference"),
+    (ROOT / "assets" / "reference" / "circuit-reference.png", "assets/reference"),
     (ROOT / "tools" / "ardpicprog.exe", "tools"),
     (ROOT / "tools" / "avrdude" / "avrdude.exe", "tools/avrdude"),
     (ROOT / "tools" / "avrdude" / "avrdude.conf", "tools/avrdude"),
@@ -45,7 +45,6 @@ for path in sorted((ROOT / "tools" / "avrdude").glob("*.dll")):
 hiddenimports = [
     "serial",
     "serial.tools.list_ports",
-    "PySide6.QtSvg",
 ]
 
 analysis = Analysis(

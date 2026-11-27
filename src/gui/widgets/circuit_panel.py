@@ -6,9 +6,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QByteArray, QPoint, QRectF, Qt, QUrl
+from PySide6.QtCore import QPoint, Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QImage, QPainter, QWheelEvent
-from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -25,7 +24,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.drawio import DrawioRenderError, drawio_to_svg
 from core.mcu_db import DEFAULT_DEVICE, McuDevice, lookup
 from core.pinout_db import (
     MODE_ZIF_8,
@@ -44,36 +42,43 @@ def _assets_reference_dir() -> Path:
     return base / "assets" / "reference"
 
 
-class ZoomableSvgView(QScrollArea):
-    """Crisp, high-DPI SVG viewer with Ctrl+Wheel zoom and drag-to-pan."""
+class ZoomableImageView(QScrollArea):
+    """Zoomable, high-DPI raster image viewer with Ctrl+Wheel and drag-to-pan."""
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setWidgetResizable(False)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setFrameShape(QFrame.Shape.NoFrame)
-        self.setObjectName("svgScroll")
-        self._svg_bytes = b""
-        self._renderer = QSvgRenderer()
+        self.setObjectName("imageScroll")
+        self._image_bytes = b""
+        self._image = QImage()
         self._zoom = 1.0
         self._fit_mode = True
         self._drag_pos: Optional[QPoint] = None
-        self._canvas = _SvgCanvas(self._renderer, self)
+        self._canvas = _ImageCanvas(self._image, self)
         self.setWidget(self._canvas)
         self.setMinimumHeight(220)
         self.setMaximumHeight(300)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-    def set_svg(self, svg_bytes: bytes) -> None:
-        self._svg_bytes = svg_bytes
-        self._renderer.load(QByteArray(svg_bytes))
+    def set_image(self, image_bytes: bytes) -> None:
+        image = QImage.fromData(image_bytes)
+        if image.isNull():
+            raise ValueError("The circuit reference image could not be decoded.")
+        self._image_bytes = image_bytes
+        self._image = image
+        self._canvas.set_image(image)
         self._fit_mode = True
         self._update_canvas_size()
-        self._canvas.update()
 
     @property
-    def svg_bytes(self) -> bytes:
-        return self._svg_bytes
+    def image_bytes(self) -> bytes:
+        return self._image_bytes
+
+    @property
+    def image(self) -> QImage:
+        return self._image
 
     def zoom_in(self) -> None:
         self._fit_mode = False
@@ -88,7 +93,7 @@ class ZoomableSvgView(QScrollArea):
         self._update_canvas_size()
 
     def _set_zoom(self, zoom: float) -> None:
-        self._zoom = max(0.35, min(3.5, zoom))
+        self._zoom = max(0.05, min(3.5, zoom))
         self._update_canvas_size()
 
     def resizeEvent(self, event) -> None:  # noqa: N802
@@ -128,48 +133,39 @@ class ZoomableSvgView(QScrollArea):
         super().mouseReleaseEvent(event)
 
     def _update_canvas_size(self) -> None:
-        if not self._renderer.isValid():
-            return
-        natural = self._renderer.defaultSize()
-        if natural.width() <= 0 or natural.height() <= 0:
+        if self._image.isNull():
             return
         viewport = self.viewport().size()
         if self._fit_mode and viewport.width() > 40 and viewport.height() > 40:
-            scale = min((viewport.width() - 16) / natural.width(), (viewport.height() - 16) / natural.height(), 1.35)
-            self._zoom = max(scale, 0.35)
+            scale = min(
+                (viewport.width() - 16) / self._image.width(),
+                (viewport.height() - 16) / self._image.height(),
+                1.35,
+            )
+            self._zoom = max(scale, 0.05)
         self._canvas.setFixedSize(
-            max(240, int(natural.width() * self._zoom)),
-            max(180, int(natural.height() * self._zoom)),
+            max(1, int(self._image.width() * self._zoom)),
+            max(1, int(self._image.height() * self._zoom)),
         )
         self._canvas.update()
 
-    def render_png(self, scale: float = 2.0) -> QImage:
-        natural = self._renderer.defaultSize()
-        width = max(800, int(natural.width() * scale))
-        height = max(500, int(natural.height() * scale))
-        image = QImage(width, height, QImage.Format.Format_ARGB32_Premultiplied)
-        image.fill(Qt.GlobalColor.white)
-        painter = QPainter(image)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        self._renderer.render(painter, QRectF(0, 0, width, height))
-        painter.end()
-        return image
 
-
-class _SvgCanvas(QWidget):
-    def __init__(self, renderer: QSvgRenderer, parent: Optional[QWidget] = None) -> None:
+class _ImageCanvas(QWidget):
+    def __init__(self, image: QImage, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self._renderer = renderer
+        self._image = image
         self.setCursor(Qt.CursorShape.OpenHandCursor)
 
+    def set_image(self, image: QImage) -> None:
+        self._image = image
+        self.update()
+
     def paintEvent(self, _event) -> None:  # noqa: N802
-        if not self._renderer.isValid():
+        if self._image.isNull():
             return
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
-        self._renderer.render(painter, QRectF(0, 0, self.width(), self.height()))
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.drawImage(self.rect(), self._image)
         painter.end()
 
 
@@ -246,31 +242,36 @@ class CircuitPanel(QWidget):
         for button in (self.btn_zoom_out, self.btn_fit, self.btn_zoom_in):
             button.setFixedSize(42, 28)
             controls.addWidget(button)
-        self.btn_open_source = QPushButton("Open editable source")
-        self.btn_open_source.setAccessibleName("Open editable diagrams.net circuit source")
-        self.btn_open_source.setToolTip("Open the source file in the default diagrams.net-compatible editor")
+        self.btn_open_source = QPushButton("Open image file")
+        self.btn_open_source.setAccessibleName("Open supplied circuit reference image")
+        self.btn_open_source.setToolTip("Open the supplied PNG circuit reference image")
         controls.addWidget(self.btn_open_source)
         page_layout.addLayout(controls)
 
-        self.reference_view = ZoomableSvgView()
-        self.reference_view.setAccessibleName("Rendered circuit connection diagram")
+        self.reference_view = ZoomableImageView()
+        self.reference_view.setAccessibleName("Supplied circuit reference image")
         self.reference_view.setAccessibleDescription(
-            "Image rendered from the supplied diagrams.net XML. Use zoom controls to inspect connection labels."
+            "User-supplied circuit reference PNG. This drawing is unverified and is separate from the firmware wiring table."
         )
-        source_file = _assets_reference_dir() / "user-circuit-diagram.drawio"
-        self.btn_open_source.setEnabled(source_file.is_file())
+        image_file = _assets_reference_dir() / "circuit-reference.png"
+        self.btn_open_source.setEnabled(image_file.is_file())
         self.btn_open_source.clicked.connect(
-            lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(source_file)))
+            lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(image_file)))
         )
         self.btn_zoom_out.clicked.connect(self.reference_view.zoom_out)
         self.btn_fit.clicked.connect(self.reference_view.zoom_fit)
         self.btn_zoom_in.clicked.connect(self.reference_view.zoom_in)
-        try:
-            self.reference_view.set_svg(drawio_to_svg(source_file))
-        except DrawioRenderError as exc:
-            self.reference_view.setAccessibleDescription(str(exc))
+        if image_file.is_file():
+            try:
+                self.reference_view.set_image(image_file.read_bytes())
+            except (OSError, ValueError) as exc:
+                self.reference_view.setAccessibleDescription(str(exc))
+                self.reference_notice.setText(
+                    f"The supplied circuit image could not be displayed: {exc} Check the datasheet and hardware guide before wiring."
+                )
+        else:
             self.reference_notice.setText(
-                f"The circuit source could not be displayed: {exc} Check the datasheet and hardware guide before wiring."
+                "The supplied circuit image is missing. Check the datasheet and hardware guide before wiring."
             )
         page_layout.addWidget(self.reference_view, 3)
 
@@ -374,22 +375,15 @@ class CircuitPanel(QWidget):
         self.wiring_table.resizeRowsToContents()
 
     def _export_reference(self) -> None:
-        """Export the rendered user-supplied reference image (not a generated wiring map)."""
-        default_name = "circuit_reference.svg"
-        path, selected_filter = QFileDialog.getSaveFileName(
+        """Export the original user-supplied PNG, not a generated wiring map."""
+        path, _selected_filter = QFileDialog.getSaveFileName(
             self,
             "Export Circuit Reference",
-            default_name,
-            "SVG Vector (*.svg);;PNG Image (*.png)",
+            "circuit_reference.png",
+            "PNG Image (*.png)",
         )
         if not path:
             return
-        if path.lower().endswith(".png") or "PNG" in selected_filter:
-            if not path.lower().endswith(".png"):
-                path += ".png"
-            if not self.reference_view.render_png(scale=2.2).save(path):
-                raise OSError(f"Could not export circuit reference image to {path}")
-        else:
-            if not path.lower().endswith(".svg"):
-                path += ".svg"
-            Path(path).write_bytes(self.reference_view.svg_bytes)
+        if not path.lower().endswith(".png"):
+            path += ".png"
+        Path(path).write_bytes(self.reference_view.image_bytes)
