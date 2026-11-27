@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 from app.diagnostics import report_exception, show_diagnostic_error
 from core.avrdude import BOARDS, BOARD_BY_KEY, FlashResult, flash_firmware
 from core.serial_link import LinkError, list_serial_ports
+from gui.dialogs.firmware_editor import FirmwareEditorDialog
 from gui.workers import Worker
 
 
@@ -42,10 +43,8 @@ class FlashArduinoDialog(QDialog):
 
         layout = QVBoxLayout(self)
         note = QLabel(
-            "Uploading replaces the sketch on the selected Arduino. Choose the matching board and bootloader. "
-            "Nano firmware upload uses the board bootloader speed (115200 or 57600 baud); if sync fails, "
-            "the app retries the alternate speed. Flash this updated sketch once after upgrading the app; "
-            "the PIC programmer host link is separate and uses 9600 baud. CH340/CH341 boards use their normal COM port."
+            "Replaces the Arduino sketch. Nano upload tries 115200 first, then 57600. "
+            "The ProgramPic link uses 115200 baud."
         )
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -78,6 +77,8 @@ class FlashArduinoDialog(QDialog):
         layout.addWidget(self.progress)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        self.edit_source_button = buttons.addButton("Edit Code…", QDialogButtonBox.ButtonRole.ActionRole)
+        self.edit_source_button.clicked.connect(lambda: FirmwareEditorDialog(self).exec())
         self.flash_button = buttons.addButton("Flash Firmware", QDialogButtonBox.ButtonRole.ApplyRole)
         self.close_button = buttons.button(QDialogButtonBox.StandardButton.Close)
         self.flash_button.clicked.connect(self._flash)

@@ -16,14 +16,14 @@ def add_if_present(path: Path, destination: str, datas: list) -> None:
         datas.append((str(path), destination))
 
 
-# Include only runtime data in the portable package. Keep firmware source,
-# development documentation, icon source files, and build helpers in the repo.
+# Include runtime data and the editable ProgramPic source. Keep development
+# docs, source assets, and build helpers out of the portable package.
 datas = []
 for path, destination in (
     (ROOT / "docs" / "USER_GUIDE.md", "docs"),
+    (ROOT / "firmware" / "source" / "ProgramPic" / "ProgramPic.ino", "firmware/source/ProgramPic"),
     (ROOT / "assets" / "app-icon.ico", "assets"),
-    (ROOT / "assets" / "reference" / "ArdPicProg_1_8_horo.png", "assets/reference"),
-    (ROOT / "assets" / "reference" / "ArdPicProg.jpg", "assets/reference"),
+    (ROOT / "assets" / "reference" / "user-circuit-diagram.drawio", "assets/reference"),
     (ROOT / "tools" / "ardpicprog.exe", "tools"),
     (ROOT / "tools" / "avrdude" / "avrdude.exe", "tools/avrdude"),
     (ROOT / "tools" / "avrdude" / "avrdude.conf", "tools/avrdude"),

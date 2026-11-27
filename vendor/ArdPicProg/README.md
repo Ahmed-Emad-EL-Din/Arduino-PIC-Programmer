@@ -18,7 +18,7 @@ See http://rweather.github.io/ardpicprog/host_program.html
 
 ## OPTIONS
 * Default port: /dev/ttyUSB0
-* Default speed: 9600 bit/s
+* Default speed: 115200 bit/s
 * See http://rweather.github.io/ardpicprog/host_program.html
 
 ## AUTHOR

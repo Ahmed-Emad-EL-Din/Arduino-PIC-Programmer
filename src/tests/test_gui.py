@@ -54,16 +54,14 @@ class TestGUIIntegration(unittest.TestCase):
     def test_ch340_handshake_failure_has_actionable_firmware_guidance(self):
         message = MainWindow._actionable_operation_error(
             "Connect Programmer",
-            "COM4: no ProgramPic response after 10 seconds at 9600 baud.",
+            "COM4: no ProgramPic response after 10 seconds at 115200 baud.",
         )
         self.assertIn("Install Firmware", message)
-        self.assertIn("retries both standard Nano rates", message)
-        self.assertIn("CH340/CH341", message)
-        self.assertIn("9600", message)
+        self.assertIn("115200", message)
 
     def test_main_window_initialization(self):
         self.assertEqual(self.win.settings.theme, "dark")
-        self.assertEqual(self.win.settings.baud, 9600)
+        self.assertEqual(self.win.settings.baud, 115200)
         self.assertFalse(self.win.brand_icon.pixmap().isNull())
         self.assertFalse(self.win.log_dock.isVisible())
         toolbar = self.win.findChild(QToolBar, "mainToolbar")
@@ -76,10 +74,10 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertIsNotNone(self.win.log_pane)
         self.assertIsNotNone(self.win.cmb_board)
         self.assertIsNotNone(self.win.cmb_mcu)
-        self.assertIn("not measured", self.win.status_lbl.text())
-        self.assertIn("Raw silicon ID", self.win.btn_detect.toolTip())
+        self.assertEqual(self.win.status_lbl.text(), "Idle")
+        self.assertIn("model", self.win.btn_detect.toolTip())
         self.assertEqual(self.win.btn_erase.toolTip(), "Connect the programmer first.")
-        self.assertIn("Target selected:", self.win.chip_target.toolTip())
+        self.assertIn("PIC:", self.win.chip_target.toolTip())
         self.win.cmb_port.clear()
         self.win.cmb_port.addItem("No serial ports detected", "")
         self.win._refresh_actions()

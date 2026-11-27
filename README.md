@@ -15,7 +15,7 @@ Run Setup for a normal per-user installation—no administrator rights required.
 
 GitHub Actions artifacts remain temporary (14-day retention); tagged Windows builds publish the installer and installer-only ZIP as downloadable GitHub Release assets. The installer ZIP is not a portable app; run its setup executable to install normally.
 
-After updating, use **Install Firmware…** once to upload the matching ProgramPic sketch before connecting; the host link now defaults to 9600 baud. Nano bootloader flashing uses its separate standard rate (115200 or 57600), and the app retries both after a synchronization error.
+ProgramPic uses 115200 baud for its app link; Nano uploads try 115200 first, then 57600. Use **Install Firmware…** to update the sketch.
 
 ### Why Windows may show “Windows protected your PC”
 
@@ -37,14 +37,12 @@ Do not disable SmartScreen or bypass its warning for an unvalidated candidate. V
 - **Programmer interface:** the bundled firmware uses this Arduino Nano pin map: D2=switched target VDD, A1=external MCLR/VPP switch control, D4=PGC/clock, D7=bidirectional PGD/data, and A5=activity LED. A1 is a low-voltage logic control only: HIGH selects reset/VPP-off; LOW selects the external ~13 V VPP switch. Never connect VPP directly to A1 or another Arduino pin. Join Arduino GND, PIC VSS, and the VPP/VDD circuit ground; place 100 nF between PIC VDD and VSS. Some boards need the reset capacitor noted in the board-specific wiring reference.
 - **VPP supply:** use the supply specified by the exact programmer hardware. The LM317 drawing below is a calculation/reference circuit, not a validated substitute for the official ArdPicProg shield. The user guide's official shield reference calls for a 16–20 V input; do not apply 24 V to that shield unless its documentation explicitly permits it.
 
-### LM317 reference circuit: 24 V DC to approximately 13 V VPP
+### User-supplied circuit diagram
 
-![Reference-only LM317 circuit for approximately 13 V VPP from 24 V DC](docs/images/lm317-24v-to-13v-vpp.svg)
-
-This is the standard LM317 adjustable-regulator topology: R1=120 Ω from OUT to ADJ and R2=1.12 kΩ from ADJ to common, giving approximately 13.0 V nominal from the LM317 equation. It shows a 0.1 µF input bypass capacitor and 1 µF output capacitor. The output is **VPP only**; target VDD is a separate programmer rail, not another LM317 output. Use a regulated, current-limited 24 V DC source, a suitable heatsink, and check the output with a meter before connecting a target. Regulator dissipation depends on load (approximately (24−13) × load current). Actual output, current capacity, thermal performance, protection, and compatibility with a particular programmer have not been validated here. Do not use this reference to build or operate hardware for destructive programming without independent design review and bench testing.
+[Open the supplied editable diagrams.net source](assets/reference/user-circuit-diagram.drawio). This is an unverified reference, not a build guide: it includes a 24 V supply/regulator drawing and may not match the firmware's pin mapping or safe VPP requirements. Do not wire or power hardware from this source alone. Follow the exact target datasheet and current pinout/safety notes below; independently verify the VPP circuit before connecting a PIC. A faithful image export is not included yet because current conversion attempts alter or omit diagram details.
 
 ### Wiring notes for supported PIC packages
-Official Ho-Ro reference images are bundled in `assets/reference/`. The desktop inspector's generated view is an illustrative wiring overview, not an electrical schematic; use the official reference and exact device datasheet to confirm connections. Unverified pin mappings are flagged.
+The desktop inspector's generated view is illustrative, not an electrical schematic; confirm all connections against the exact device datasheet. Unverified pin mappings are flagged.
 
 **A. ZIF-18 Direct Mode (8-pin & 18-pin PICs)**
 *   **PIC16F84A (18-pin):** JP3 = `1-2`. Pins: VDD=14, VSS=5, MCLR=4(RA5), PGC=12(RB6), PGD=13(RB7), PGM=10(RB4).
@@ -61,10 +59,11 @@ The HEX memory-map inspector is an application feature; no screenshot is include
 
 ### Step 1 — Flash Arduino Firmware (Once)
 1. Launch **Arduino-PIC-Programmer.exe**.
-2. Menu **Programmer → Flash Arduino Firmware…**
-3. Pick board (e.g., *Arduino Uno*) and COM port.
-4. Press **Flash Firmware** in a build that contains the matching precompiled firmware and bundled `avrdude`.
-5. Confirm success only after the uploader reports that ProgramPic firmware was uploaded.
+2. Open **Programmer → Install/Update ProgramPic Firmware…**.
+3. Select the board and COM port; press **Flash Firmware**.
+4. Confirm success only after the upload finishes.
+
+Use **Programmer → Edit ProgramPic Source…** to edit, reset, or export the sketch. The installer flashes its bundled build; upload custom edits from Arduino IDE.
 
 > Windows installers are published on the Releases page after a successful tagged build. Leonardo/Micro firmware upload in this app is unsupported; use Arduino IDE for those boards.
 

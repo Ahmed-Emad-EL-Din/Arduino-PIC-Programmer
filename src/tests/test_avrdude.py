@@ -39,15 +39,16 @@ class TestFirmwareUpload(unittest.TestCase):
         self.assertEqual(outcome.board_key, "nano_new")
         self.assertFalse(outcome.fallback_used)
 
-    def test_old_nano_bootloader_uses_57600(self):
+    def test_old_nano_bootloader_tries_115200_first(self):
         result = SimpleNamespace(returncode=0, stdout="", stderr="upload complete")
         with patch("core.avrdude._resource_root", return_value=self.root), \
              patch("core.avrdude.subprocess.run", return_value=result) as run:
             outcome = flash_firmware("nano_old", "COM12")
         args = run.call_args.args[0]
         self.assertEqual(args[args.index("-P") + 1], "COM12")
-        self.assertEqual(args[args.index("-b") + 1], "57600")
-        self.assertEqual(outcome.board_key, "nano_old")
+        self.assertEqual(args[args.index("-b") + 1], "115200")
+        self.assertEqual(outcome.board_key, "nano_new")
+        self.assertEqual(outcome.baud, 115200)
         self.assertFalse(outcome.fallback_used)
 
     def test_nano_upload_retries_the_other_bootloader_baud_after_sync_failure(self):
@@ -60,24 +61,25 @@ class TestFirmwareUpload(unittest.TestCase):
         self.assertEqual(run.call_count, 2)
         first_args = run.call_args_list[0].args[0]
         retry_args = run.call_args_list[1].args[0]
-        self.assertEqual(first_args[first_args.index("-b") + 1], "57600")
-        self.assertEqual(retry_args[retry_args.index("-b") + 1], "115200")
-        self.assertEqual(outcome.board_key, "nano_new")
-        self.assertEqual(outcome.baud, 115200)
+        self.assertEqual(first_args[first_args.index("-b") + 1], "115200")
+        self.assertEqual(retry_args[retry_args.index("-b") + 1], "57600")
+        self.assertEqual(outcome.board_key, "nano_old")
+        self.assertEqual(outcome.baud, 57600)
         self.assertTrue(outcome.fallback_used)
-        self.assertIn("succeeded using the alternate 115200-baud", outcome.output)
+        self.assertIn("succeeded using the alternate 57600-baud", outcome.output)
 
     def test_both_nano_speeds_are_included_in_copyable_failure_details(self):
-        first = SimpleNamespace(returncode=1, stdout="", stderr="not in sync at 57600")
-        retry = SimpleNamespace(returncode=1, stdout="", stderr="not in sync at 115200")
+        first = SimpleNamespace(returncode=1, stdout="", stderr="not in sync at 115200")
+        retry = SimpleNamespace(returncode=1, stdout="", stderr="not in sync at 57600")
         with patch("core.avrdude._resource_root", return_value=self.root), \
              patch("core.avrdude.subprocess.run", side_effect=[first, retry]):
             with self.assertRaises(FlashError) as caught:
                 flash_firmware("nano_old", "COM4")
         message = str(caught.exception)
-        self.assertIn("57600 and 115200 baud", message)
-        self.assertIn("not in sync at 57600", message)
+        self.assertIn("115200 and 57600 baud", message)
+        self.assertIn("Attempt at 115200 baud", message)
         self.assertIn("not in sync at 115200", message)
+        self.assertIn("not in sync at 57600", message)
 
     def test_non_sync_avrdude_failure_is_reported(self):
         result = SimpleNamespace(returncode=1, stdout="", stderr="COM4 access denied")

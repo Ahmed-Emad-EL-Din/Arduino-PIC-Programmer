@@ -74,7 +74,7 @@ bool SerialPort::open(const std::string &deviceName, int speed)
 
     // CH340 USB-serial adapters reset many Nano clones when DTR is asserted.
     // Discard bootloader/reset noise, then allow up to 10 seconds for the
-    // bootloader and sketch to start while probing the standard 9600-baud
+    // bootloader and sketch to start while probing the 115200-baud
     // ProgramPic version command.
     ::PurgeComm(handle, PURGE_RXABORT | PURGE_RXCLEAR | PURGE_TXABORT | PURGE_TXCLEAR);
     buflen = 0;
@@ -111,7 +111,7 @@ bool SerialPort::open(const std::string &deviceName, int speed)
         fprintf(stderr,
                 "%s: no ProgramPic response after 10 seconds at %d baud. "
                 "Install ProgramPic firmware, select the correct COM port and Nano bootloader, "
-                "use 9600 baud for ProgramPic, and close other serial tools. CH340/CH341 adapters are "
+                "use 115200 baud for ProgramPic, and close other serial tools. CH340/CH341 adapters are "
                 "supported as standard Windows COM ports when their driver is installed.\n",
                 deviceName.c_str(), speed);
     }

@@ -50,8 +50,7 @@ class PreflightDialog(QDialog):
 
         layout = QVBoxLayout(self)
         intro = QLabel(
-            subtitle + "\n\nProgramming voltages can permanently damage a chip or board. "
-            "Check each item only after physically verifying it. Cancel sends no PIC command."
+            subtitle + "\n\nVerify each item at the hardware. Programming voltage can damage parts. Cancel sends no command."
         )
         intro.setWordWrap(True)
         layout.addWidget(intro)
@@ -92,7 +91,7 @@ class PreflightDialog(QDialog):
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
         self.continue_button = self.buttons.addButton(
-            "I verified — Continue", QDialogButtonBox.ButtonRole.AcceptRole
+            "Continue", QDialogButtonBox.ButtonRole.AcceptRole
         )
         self.continue_button.setEnabled(False)
         self.cancel_button = self.buttons.button(QDialogButtonBox.StandardButton.Cancel)
@@ -110,10 +109,7 @@ class PreflightDialog(QDialog):
         required = [check for check in self.checks if check.property("critical")]
         checked = sum(check.isChecked() for check in required)
         self.continue_button.setEnabled(bool(required) and checked == len(required))
-        self.check_summary.setText(
-            f"Verified {checked} of {len(required)} required checks. "
-            "Continue stays disabled until every item is checked."
-        )
+        self.check_summary.setText(f"{checked} of {len(required)} required checks")
 
 
 def show_preflight(parent, seen: bool, dev=DEFAULT_DEVICE, board_key: str = "uno") -> bool:

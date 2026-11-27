@@ -37,8 +37,8 @@ BOARDS: List[Board] = [
     Board("uno", "Arduino Uno", "ATmega328P", "m328p", 115200),
     Board("nano_new", "Arduino Nano (new bootloader)", "ATmega328P", "m328p", 115200,
           alternate_bootloader_baud=57600),
-    Board("nano_old", "Arduino Nano (old bootloader)", "ATmega328P", "m328p", 57600,
-          alternate_bootloader_baud=115200),
+    Board("nano_old", "Arduino Nano (old bootloader)", "ATmega328P", "m328p", 115200,
+          alternate_bootloader_baud=57600),
     Board("pro_mini_5v", "Arduino Pro Mini (5 V / 16 MHz)", "ATmega328P", "m328p", 57600,
           "Use only the 5 V / 16 MHz variant. A 3.3 V Pro Mini is not compatible with this 5 V PIC circuit."),
     Board("mega2560", "Arduino Mega 2560", "ATmega2560", "m2560", 115200),
@@ -148,9 +148,12 @@ def flash_firmware(board_key: str, port: str) -> FlashResult:
     )
     output = _avrdude_output(result)
     if result.returncode == 0:
+        actual_board_key = board.key
+        if board.key in ("nano_new", "nano_old"):
+            actual_board_key = "nano_new" if board.bootloader_baud == 115200 else "nano_old"
         return FlashResult(
-            output or f"ProgramPic firmware uploaded to {board.label} on {port}.",
-            board.key,
+            output or f"ProgramPic firmware uploaded to {BOARD_BY_KEY[actual_board_key].label} on {port}.",
+            actual_board_key,
             board.bootloader_baud,
         )
 

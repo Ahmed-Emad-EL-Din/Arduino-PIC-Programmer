@@ -158,7 +158,7 @@ class ProgrammerSession:
             raise ProtocolError(output or f"ArdPicProg exited with status {result.returncode}")
         return output
 
-    def connect(self, port: str, baud: int = 9600, progress: Progress = None) -> ProgrammerState:
+    def connect(self, port: str, baud: int = 115200, progress: Progress = None) -> ProgrammerState:
         if not port:
             raise ProgrammerNotReady("Select a serial port first.")
         output = self._checked(["--pic-serial-port", port, "--speed", baud, "--list-devices"], progress)

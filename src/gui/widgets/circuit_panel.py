@@ -1,17 +1,4 @@
-"""Interactive wiring overview, pinout, HEX memory, and hardware reference.
-
-Provides the live right-hand workbench panel (`CircuitPanel`):
-  1. **Wiring Overview** — Illustrative vector overview tailored to the selected
-     Arduino board and PIC, with zoom, pan, reset, and SVG / PNG export.
-  2. **IC Pinout & ZIF Seating** — Scale-proportioned PDIP package diagram with
-     Pin-1 notch, color-coded ICSP badges, ZIF-18 slot placement / JP3 jumper
-     guide, and a structured pin-by-pin wiring table.
-  3. **HEX Memory Map** — Visual usage bars + flat word dump (Program Flash,
-     Configuration / ID words, and Data EEPROM) for the loaded `.hex` file.
-  4. **Reference Build (Ho-Ro)** — Bundled `ArdPicProg_1_8_horo.png` official
-     schematic and `ArdPicProg.jpg` Nano + ZIF-18 perfboard build photo, plus
-     explicit compatibility warning about legacy `rweather` pinouts.
-"""
+"""Interactive wiring overview, pinout, HEX memory, and hardware reference."""
 
 from __future__ import annotations
 
@@ -19,13 +6,13 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QByteArray, QPoint, QRectF, QSize, Qt
+from PySide6.QtCore import QByteArray, QPoint, QRectF, QSize, Qt, QUrl
 from PySide6.QtGui import (
+    QDesktopServices,
     QColor,
     QFont,
     QImage,
     QPainter,
-    QPixmap,
     QWheelEvent,
 )
 from PySide6.QtSvg import QSvgRenderer
@@ -38,7 +25,6 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
-    QScrollArea,
     QSizePolicy,
     QTabWidget,
     QTableWidget,
@@ -404,56 +390,23 @@ class CircuitPanel(QWidget):
         lay.setSpacing(8)
 
         note = QLabel(
-            "<b>Current firmware wiring (Nano):</b> D2=switched VDD, A1=external "
-            "MCLR/VPP switch control (HIGH=reset/VPP off, LOW=select VPP), D4=CLK, "
-            "D7=bidirectional DATA, A5=activity LED. <b>Never connect ~13 V directly "
-            "to A1 or any Arduino pin.</b> The upstream Ho-Ro reference images below "
-            "show a different pinout/polarity; they are historical references, not "
-            "wiring instructions for the firmware bundled by this app. Follow the "
-            "current pinout table and the exact target/VPP circuit documentation."
+            "The supplied diagrams.net source is available below. A faithful image export "
+            "is not bundled yet; use the source as the reference. For safe wiring, follow "
+            "the firmware pin map and PIC datasheet. Never connect VPP to an Arduino pin."
         )
         note.setWordWrap(True)
         lay.addWidget(note)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        inner = QWidget()
-        iv = QVBoxLayout(inner)
-        iv.setSpacing(14)
-
         ref_dir = _assets_reference_dir()
-        schem_png = ref_dir / "ArdPicProg_1_8_horo.png"
-        photo_jpg = ref_dir / "ArdPicProg.jpg"
+        source_file = ref_dir / "user-circuit-diagram.drawio"
+        open_source = QPushButton("Open supplied circuit source")
+        open_source.setToolTip("Open the editable diagrams.net source")
+        open_source.setEnabled(source_file.is_file())
+        open_source.clicked.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(source_file))))
+        lay.addWidget(open_source)
+        lay.addStretch(1)
 
-        if schem_png.is_file():
-            t1 = QLabel("Reference ZIF-18 shield schematic (ArdPicProg_1_8_horo.png)")
-            t1.setObjectName("sectionLabel")
-            iv.addWidget(t1)
-            img1 = QLabel()
-            img1.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            img1.setStyleSheet("background:#ffffff; border-radius:6px; padding:8px;")
-            pm1 = QPixmap(str(schem_png))
-            if not pm1.isNull():
-                img1.setPixmap(pm1.scaledToWidth(660, Qt.TransformationMode.SmoothTransformation))
-            iv.addWidget(img1)
-
-        if photo_jpg.is_file():
-            t2 = QLabel("Reference Arduino Nano + 18-pin ZIF hardware build (Ho-Ro)")
-            t2.setObjectName("sectionLabel")
-            iv.addWidget(t2)
-            img2 = QLabel()
-            img2.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            pm2 = QPixmap(str(photo_jpg))
-            if not pm2.isNull():
-                img2.setPixmap(pm2.scaledToWidth(660, Qt.TransformationMode.SmoothTransformation))
-            iv.addWidget(img2)
-
-        iv.addStretch()
-        scroll.setWidget(inner)
-        lay.addWidget(scroll, 1)
-
-        self.tabs.addTab(page, "ArdPicProg Reference")
+        self.tabs.addTab(page, "Circuit Reference")
 
     # ------------------------------------------------------------------
     # Public State Updaters
