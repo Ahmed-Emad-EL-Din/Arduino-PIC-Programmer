@@ -42,7 +42,7 @@ For a PIC16F84A in the published ZIF shield, JP3 is commonly set to 1-2; an 8-pi
 3. Upload replaces the Arduino's current sketch. Keep USB connected and remove/reinstall the reset capacitor as directed by the dialog.
 
 ### Step 3 — Connect & verify
-1. In the **Programmer** card, select the Arduino port and click **Connect** (or use `Ctrl+P`).
+1. In the **Programmer** card, select the Arduino port and click **Connect** (or use `Ctrl+P`). The ProgramPic runtime link is fixed at **9600 baud**; the app resets any stale saved speed to 9600. Nano bootloader upload uses a separate speed.
 2. A successful handshake shows the firmware version. If the port is busy, close Arduino Serial Monitor/other serial tools, select **Rescan**, and retry.
 
 ## 3. Every-day programming flow

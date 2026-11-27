@@ -21,6 +21,7 @@ from .ihex import HexImage, IHexError
 from .mcu_db import McuDevice, find_by_id, lookup
 from .protocol import DeviceInfo, ProgrammerNotReady, ProgrammerState, ProtocolError
 from .safety import SafetyViolation, gate_hex_fits
+from .serial_config import PROGRAMMER_BAUD
 
 Progress = Optional[Callable[[str], None]]
 Percent = Optional[Callable[[int, int], None]]
@@ -158,10 +159,20 @@ class ProgrammerSession:
             raise ProtocolError(output or f"ArdPicProg exited with status {result.returncode}")
         return output
 
-    def connect(self, port: str, baud: int = 9600, progress: Progress = None) -> ProgrammerState:
+    def connect(
+        self, port: str, baud: int = PROGRAMMER_BAUD, progress: Progress = None
+    ) -> ProgrammerState:
         if not port:
             raise ProgrammerNotReady("Select a serial port first.")
-        output = self._checked(["--pic-serial-port", port, "--speed", baud, "--list-devices"], progress)
+        if int(baud) != PROGRAMMER_BAUD:
+            raise ProgrammerNotReady(
+                f"The ProgramPic runtime link requires {PROGRAMMER_BAUD} baud; "
+                "Arduino bootloader upload speed is separate."
+            )
+        output = self._checked(
+            ["--pic-serial-port", port, "--speed", PROGRAMMER_BAUD, "--list-devices"],
+            progress,
+        )
         devices = []
         in_list = False
         for line in output.splitlines():

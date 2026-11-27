@@ -1,7 +1,11 @@
 import inspect
 from pathlib import Path
+from unittest.mock import patch
 
+from app.settings import AppSettings
 from core.programmer import ProgrammerSession
+from core.protocol import ProgrammerNotReady
+from core.serial_config import PROGRAMMER_BAUD
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -13,7 +17,49 @@ def test_program_pic_runtime_link_and_host_default_to_9600_baud():
 
     assert "Serial.begin( 9600 );" in firmware
     assert "int opt_speed = 9600;" in host
-    assert inspect.signature(ProgrammerSession.connect).parameters["baud"].default == 9600
+    assert inspect.signature(ProgrammerSession.connect).parameters["baud"].default == PROGRAMMER_BAUD
+
+
+def test_runtime_connection_always_uses_9600_and_rejects_bootloader_rates():
+    session = ProgrammerSession()
+    with patch.object(session, "_checked", return_value="Supported devices:") as checked:
+        session.connect("COM4")
+    assert checked.call_args.args[0] == [
+        "--pic-serial-port", "COM4", "--speed", PROGRAMMER_BAUD, "--list-devices"
+    ]
+
+    try:
+        session.connect("COM4", baud=115200)
+    except ProgrammerNotReady as exc:
+        assert "requires 9600 baud" in str(exc)
+    else:
+        raise AssertionError("A bootloader baud must not be used for runtime connection")
+
+
+def test_saved_custom_baud_is_forced_back_to_program_pic_rate():
+    class MemorySettings:
+        def __init__(self, *_args):
+            self.values = {"baud": 115200, "baud_9600_migrated": True}
+
+        def beginGroup(self, _group):
+            pass
+
+        def setValue(self, key, value):
+            self.values[key] = value
+
+        def value(self, key, default=None, **_kwargs):
+            return self.values.get(key, default)
+
+        def sync(self):
+            pass
+
+    with patch("app.settings.QSettings", MemorySettings):
+        settings = AppSettings()
+        assert settings.baud == PROGRAMMER_BAUD
+        assert settings._settings.values["baud"] == PROGRAMMER_BAUD
+        settings.baud = 115200
+        assert settings.baud == PROGRAMMER_BAUD
+        assert settings._settings.values["baud"] == PROGRAMMER_BAUD
 
 
 def test_program_pic_wiring_profile_matches_pic16f84a_shield_connection():
