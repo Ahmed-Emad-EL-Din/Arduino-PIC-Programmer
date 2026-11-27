@@ -2,7 +2,7 @@
 
 ## Windows build status
 
-**Recommended: install the app.** After the updated Windows workflow passes, open the [Windows desktop package workflow](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/actions/workflows/build-windows.yml), select the successful run, and download **Arduino-PIC-Programmer-Windows-x64-installer**. Extract that artifact ZIP; it contains the setup executable and its `.sha256` sidecar. Verify before installing:
+**Recommended: install the app.** Download the Windows x64 installer from the [GitHub Releases page](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases). Each published release provides the setup executable and SHA-256 sidecar, plus an installer-only ZIP and its sidecar. Verify the setup executable before installing:
 
 ```powershell
 $setup = 'Arduino-PIC-Programmer-Setup-x64.exe'
@@ -13,7 +13,7 @@ if ($actual -ne $expected) { throw 'SHA-256 mismatch; do not install this file.'
 
 Run Setup for a normal per-user installation—no administrator rights required. It creates a Start menu shortcut, registers the app with Windows Installed Apps/Apps & Features, provides an uninstaller, and can create an optional desktop shortcut. It uses the app's branded icon. The separate optional **Arduino-PIC-Programmer-Installer-Windows-x64** ZIP is deliberately installer-only: when opened, it contains the Setup executable and no loose runtime files. The `.sha256` checksum is supplied beside the ZIP as a separate artifact file.
 
-Artifacts are temporary (14-day retention; GitHub sign-in/repository access may be required), **not published GitHub Releases**. The installer ZIP is not a portable app; run its setup executable to install normally.
+GitHub Actions artifacts remain temporary (14-day retention); tagged Windows builds publish the installer and installer-only ZIP as downloadable GitHub Release assets. The installer ZIP is not a portable app; run its setup executable to install normally.
 
 After updating, use **Install Firmware…** once to upload the matching ProgramPic sketch before connecting; the host link now defaults to 9600 baud. Nano bootloader flashing uses its separate standard rate (115200 or 57600), and the app retries both after a synchronization error.
 
@@ -66,7 +66,7 @@ The HEX memory-map inspector is an application feature; no screenshot is include
 4. Press **Flash Firmware** in a build that contains the matching precompiled firmware and bundled `avrdude`.
 5. Confirm success only after the uploader reports that ProgramPic firmware was uploaded.
 
-> The candidate is a temporary Actions artifact, not a published release. Leonardo/Micro firmware upload in this app is unsupported; use Arduino IDE for those boards.
+> Windows installers are published on the Releases page after a successful tagged build. Leonardo/Micro firmware upload in this app is unsupported; use Arduino IDE for those boards.
 
 ### Step 2 — Connect & Verify
 1. Connect the Arduino by USB. Only connect an external VPP supply that matches the exact programmer hardware; the reference LM317 circuit above is not hardware-validated.
@@ -120,11 +120,11 @@ PIC16F872, PIC16F877/A, PIC16F882–887, PIC12F629, PIC12F675, PIC12F683.
 ---
 
 ## 5. Requirements
-* **Windows 10/11:** a temporary CI candidate artifact is available above; no validated Windows executable has been published as a GitHub Release.
+* **Windows 10/11:** the installer is published on the GitHub Releases page. It remains a software candidate until physical hardware acceptance is complete.
 * **Arduino Board** + **LM317 13V Circuit** + **ZIF/ICSP Shield** for hardware use.
 * **24V DC Supply** (as used in the circuit image above; verify your exact circuit design).
 * Firmware source is in `firmware/source/`; Windows build scripts compile board-specific firmware and stage `avrdude` for the portable package.
-* A Windows executable has not yet been published; build results must pass the Windows and hardware acceptance checklist before release.
+* The Windows installer is published as a software candidate; physical hardware acceptance is still required before it can be described as validated.
 
 ---
 
@@ -142,7 +142,7 @@ PIC16F872, PIC16F877/A, PIC16F882–887, PIC12F629, PIC12F675, PIC12F683.
 └── docs/                     # user guide and hardware notes
 ```
 
-The Windows candidate workflow has passed; a clean-machine launch and physical-device acceptance tests remain outstanding. No validated release asset is published yet.
+The Windows candidate workflow has passed. A downloadable installer candidate is published on the Releases page; clean-machine and physical-device acceptance tests remain outstanding.
 
 ---
 
