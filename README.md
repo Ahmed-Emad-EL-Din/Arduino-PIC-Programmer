@@ -28,7 +28,7 @@ Tagged Windows builds run the test suite, compile the firmware, build the app, v
 - Opens, inspects, and exports Intel HEX data, with target-memory checks and read-back verification.
 - Supports guarded connect, detect, program, erase, read, and verify workflows, with a preflight checklist and confirmation for destructive operations.
 - Provides a board/PIC connection table, HEX memory inspector, activity log, themes, and editable firmware source.
-- Shows the exact supplied circuit image in the app and below as an **unverified example circuit for PIC16F84A**. The selected board/PIC firmware connection table is separate and may not match the example.
+- Shows the exact supplied image in the **Circuit Reference** tab and the selected firmware map in a separate **Point-to-Point Wiring** tab. The PIC16F84A drawing is an unverified example and may not match the selected profile.
 
 See the [User Guide](docs/USER_GUIDE.md) for the application workflow and board-specific notes.
 

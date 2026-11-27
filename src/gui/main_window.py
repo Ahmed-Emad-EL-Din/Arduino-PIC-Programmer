@@ -226,7 +226,7 @@ class MainWindow(QMainWindow):
         lcol.addStretch(1)
         left_scroll.setWidget(left_body)
 
-        # Right pane: one circuit reference with the selected wiring table below
+        # Right pane: selected hardware context plus adjacent reference and wiring tabs
         right_wrap = QWidget()
         right_wrap.setObjectName("inspectorPane")
         right_wrap.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)

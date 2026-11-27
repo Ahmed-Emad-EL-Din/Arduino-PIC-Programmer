@@ -84,10 +84,12 @@ def build_qss(t: ThemeTokens, font_size: int = 10) -> str:
     QCheckBox::indicator {{ width: 16px; height: 16px; }}
     QProgressBar {{ background: {t.raised}; border: 1px solid {t.border}; border-radius: 5px; text-align: center; min-height: 12px; }}
     QProgressBar::chunk {{ background: {t.accent}; border-radius: 4px; }}
-    QHeaderView::section {{ background: {t.raised}; padding: 8px; border: 0; }}
-    QTabWidget::pane {{ border: 1px solid {t.border}; border-radius: 6px; }}
-    QTabBar::tab {{ background: {t.raised}; border: 1px solid {t.border}; padding: 8px 12px; }}
-    QTabBar::tab:selected {{ background: {t.surface}; border-bottom-color: {t.accent}; }}
+    QHeaderView::section {{ background: {t.raised}; color: {t.text}; padding: 8px 10px; border: 0; font-weight: 600; }}
+    QTableWidget#wiringTable {{ alternate-background-color: {t.raised}; gridline-color: {t.border}; }}
+    QTabWidget::pane {{ border: 1px solid {t.border}; border-radius: 6px; top: -1px; }}
+    QTabBar::tab {{ background: {t.raised}; color: {t.subtext}; border: 1px solid {t.border}; border-bottom-color: {t.border}; padding: 9px 16px; min-width: 132px; min-height: 30px; margin-right: 4px; }}
+    QTabBar::tab:hover:!selected {{ color: {t.text}; background: {t.surface}; }}
+    QTabBar::tab:selected {{ color: {t.text}; background: {t.surface}; border: 1px solid {t.border}; border-bottom: 3px solid {t.accent}; font-weight: 700; }}
     QDockWidget::title {{ background: {t.surface}; padding: 8px; }}
     QToolBar {{ background: {t.surface}; border: 0; spacing: 4px; padding: 4px; }}
     QMenu {{ background: {t.surface}; border: 1px solid {t.border}; }}
