@@ -219,7 +219,7 @@ class CircuitPanel(QWidget):
         page_layout.setSpacing(6)
 
         self.reference_notice = QLabel(
-            "Unverified user drawing; it may not match firmware wiring. Check the PIC datasheet and hardware guide; never connect VPP to an Arduino pin."
+            "Unverified example circuit for PIC16F84A only; it shows a 24 V input and LM317. It may not match firmware wiring. Verify your hardware and VPP supply; never connect VPP to an Arduino pin or apply 24 V to a shield unless its documentation permits it."
         )
         self.reference_notice.setObjectName("guidance")
         self.reference_notice.setAccessibleName("Circuit reference safety warning")
@@ -228,7 +228,7 @@ class CircuitPanel(QWidget):
 
         controls = QHBoxLayout()
         controls.setSpacing(6)
-        title = QLabel("Circuit reference")
+        title = QLabel("Example circuit for PIC16F84A")
         title.setObjectName("sectionLabel")
         controls.addWidget(title, 1)
         self.btn_zoom_out = QPushButton("−")
@@ -249,9 +249,9 @@ class CircuitPanel(QWidget):
         page_layout.addLayout(controls)
 
         self.reference_view = ZoomableImageView()
-        self.reference_view.setAccessibleName("Supplied circuit reference image")
+        self.reference_view.setAccessibleName("PIC16F84A example circuit image")
         self.reference_view.setAccessibleDescription(
-            "User-supplied circuit reference PNG. This drawing is unverified and is separate from the firmware wiring table."
+            "User-supplied, unverified example circuit for PIC16F84A. It is separate from the selected board/PIC firmware wiring table."
         )
         image_file = _assets_reference_dir() / "circuit-reference.png"
         self.btn_open_source.setEnabled(image_file.is_file())
@@ -279,7 +279,7 @@ class CircuitPanel(QWidget):
         table_title.setObjectName("sectionLabel")
         page_layout.addWidget(table_title)
         self.table_note = QLabel(
-            "Firmware map only; verify pinouts against board documentation. It may not match the drawing above."
+            "Firmware map for the selected board and PIC only. The drawing above is an example for PIC16F84A and may not match other selections."
         )
         self.table_note.setObjectName("muted")
         self.table_note.setWordWrap(True)

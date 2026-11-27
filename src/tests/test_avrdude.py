@@ -39,7 +39,7 @@ class TestFirmwareUpload(unittest.TestCase):
         self.assertEqual(outcome.board_key, "nano_new")
         self.assertFalse(outcome.fallback_used)
 
-    def test_old_nano_bootloader_tries_115200_first(self):
+    def test_nano_tries_115200_first_and_maps_success_to_new_bootloader(self):
         result = SimpleNamespace(returncode=0, stdout="", stderr="upload complete")
         with patch("core.avrdude._resource_root", return_value=self.root), \
              patch("core.avrdude.subprocess.run", return_value=result) as run:

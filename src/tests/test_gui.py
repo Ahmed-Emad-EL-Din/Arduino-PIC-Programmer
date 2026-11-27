@@ -8,7 +8,7 @@ from unittest.mock import patch
 # Use Qt's offscreen platform in CI unless the caller explicitly selected one.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QMessageBox, QToolBar
+from PySide6.QtWidgets import QApplication, QLabel, QMessageBox, QToolBar
 from PySide6.QtTest import QTest
 from PySide6.QtCore import Qt
 
@@ -54,14 +54,14 @@ class TestGUIIntegration(unittest.TestCase):
     def test_ch340_handshake_failure_has_actionable_firmware_guidance(self):
         message = MainWindow._actionable_operation_error(
             "Connect Programmer",
-            "COM4: no ProgramPic response after 10 seconds at 115200 baud.",
+            "COM4: no ProgramPic response after 10 seconds at 9600 baud.",
         )
         self.assertIn("install firmware", message.lower())
-        self.assertIn("115200", message)
+        self.assertIn("9600", message)
 
     def test_main_window_initialization(self):
         self.assertEqual(self.win.settings.theme, "dark")
-        self.assertEqual(self.win.settings.baud, 115200)
+        self.assertEqual(self.win.settings.baud, 9600)
         self.assertFalse(self.win.brand_icon.pixmap().isNull())
         self.assertFalse(self.win.log_dock.isVisible())
         self.assertIsNone(self.win.findChild(QToolBar, "mainToolbar"))
@@ -267,6 +267,29 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertIn("upload completed", dlg_flash.status.text().lower())
         dlg_flash.close()
 
+    def test_flash_dialog_uses_current_board_and_explains_baud_distinction(self):
+        # The main workbench selection is authoritative; a stale saved setting
+        # must not make the modal claim a different Nano bootloader.
+        self.win.settings.board_key = "nano_old"
+        dlg_flash = FlashArduinoDialog(
+            self.win.settings, self.win.lane, self.win, board_key="nano_new"
+        )
+        self.assertEqual(dlg_flash.board.currentData(), "nano_new")
+        note = dlg_flash.findChild(QLabel)
+        self.assertIsNotNone(note)
+        self.assertIn("115200 first", note.text())
+        self.assertIn("9600 baud", note.text())
+        dlg_flash.close()
+
+    def test_main_firmware_dialog_receives_current_nano_selection(self):
+        self.win.cmb_board.setCurrentIndex(self.win.cmb_board.findData("nano_new"))
+        self.win.settings.board_key = "nano_old"  # Simulate stale persisted UI state.
+        with patch("gui.main_window.FlashArduinoDialog") as dialog_type:
+            dialog_type.return_value.exec.return_value = 0
+            self.win._flash_arduino()
+        self.assertEqual(dialog_type.call_args.kwargs["board_key"], "nano_new")
+        self.assertEqual(self.win.settings.board_key, "nano_new")
+
     def test_flash_dialog_explains_unsupported_bootloader_uploads(self):
         dlg_flash = FlashArduinoDialog(self.win.settings, self.win.lane, self.win)
         dlg_flash.board.setCurrentIndex(dlg_flash.board.findData("uno"))
@@ -351,12 +374,20 @@ class TestGUIIntegration(unittest.TestCase):
         image_bytes = reference.image_bytes
         self.assertTrue(image_bytes.startswith(b"\x89PNG\r\n\x1a\n"))
         self.assertEqual(reference.image.width(), 3570)
+        self.assertEqual(reference.image.height(), 2978)
+        self.assertIn("PIC16F84A", self.win.circuit_panel.reference_notice.text())
+        self.assertIn("unverified", self.win.circuit_panel.reference_notice.text().lower())
+        root = Path(__file__).resolve().parents[2]
         self.assertEqual(
             image_bytes,
-            (Path(__file__).resolve().parents[2] / "assets" / "reference" / "circuit-reference.png").read_bytes(),
+            (root / "assets" / "reference" / "circuit-reference.png").read_bytes(),
+        )
+        readme = (root / "README.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "![User-supplied example circuit for PIC16F84A](assets/reference/circuit-reference.png)",
+            readme,
         )
         self.assertFalse(reference.image.isNull())
-        self.assertIn("unverified", self.win.circuit_panel.reference_notice.text().lower())
 
 if __name__ == "__main__":
     unittest.main()

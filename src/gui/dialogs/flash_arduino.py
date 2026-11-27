@@ -24,7 +24,7 @@ from gui.workers import Worker
 class FlashArduinoDialog(QDialog):
     flashed = Signal(str, str)
 
-    def __init__(self, settings, lane=None, parent=None) -> None:
+    def __init__(self, settings, lane=None, parent=None, board_key: str | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Flash ProgramPic firmware")
         self.settings = settings
@@ -43,8 +43,9 @@ class FlashArduinoDialog(QDialog):
 
         layout = QVBoxLayout(self)
         note = QLabel(
-            "Replaces the Arduino sketch. Nano upload tries 115200 first, then 57600. "
-            "The ProgramPic link uses 115200 baud."
+            "Replaces the Arduino sketch. Nano upload tries 115200 first, then 57600 if sync fails. "
+            "The ProgramPic runtime link uses 9600 baud; this is separate from upload speed. "
+            "The Nano bootloader label reflects which upload speed succeeds."
         )
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -53,7 +54,7 @@ class FlashArduinoDialog(QDialog):
         self.board = QComboBox()
         for board in BOARDS:
             self.board.addItem(board.label, board.key)
-        idx = self.board.findData(settings.board_key)
+        idx = self.board.findData(board_key or settings.board_key)
         self.board.setCurrentIndex(max(0, idx))
         self.port = QComboBox()
         self.rescan = QPushButton("Rescan")

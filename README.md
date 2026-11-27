@@ -1,6 +1,6 @@
 # Arduino-PIC Programmer
 
-A Windows desktop workbench for an Arduino-based PIC programmer using the bundled ProgramPic firmware and ArdPicProg host. Load and inspect Intel HEX files, connect to the programmer, select a supported PIC, and run guarded read, erase, program, and verify operations from one Qt application.
+A Windows desktop workbench for an Arduino-based PIC programmer using the bundled ProgramPic firmware and ArdPicProg host. Load and inspect Intel HEX files, connect to the programmer, select a supported PIC, and run guarded read, erase, program, and verify operations from one Qt application. This project talks to its own Arduino/ProgramPic programmer—not a Microchip PICkit device.
 
 > **Hardware caution:** This project has not completed physical hardware acceptance. A successful build or Windows installer test does not verify electrical safety, target compatibility, VPP voltage, or programming reliability. Treat releases as software candidates; independently validate the exact programmer, target package, datasheet, and wiring before connecting hardware. Do not perform destructive programming based only on the app's checks or the reference drawing.
 
@@ -24,11 +24,11 @@ Tagged Windows builds run the test suite, compile the firmware, build the app, v
 
 ## What it does
 
-- Manages the Arduino serial connection and bundled ProgramPic firmware; Nano uploads try 115200 baud first and then 57600 baud.
+- Manages the Arduino serial connection and bundled ProgramPic firmware. Firmware upload uses the Arduino bootloader (Nano: try 115200 baud first, then 57600 if synchronization fails); after flashing, the ProgramPic runtime link uses 9600 baud.
 - Opens, inspects, and exports Intel HEX data, with target-memory checks and read-back verification.
 - Supports guarded connect, detect, program, erase, read, and verify workflows, with a preflight checklist and confirmation for destructive operations.
 - Provides a board/PIC connection table, HEX memory inspector, activity log, themes, and editable firmware source.
-- Displays the supplied circuit image in the **Circuit Reference** view. Its board/PIC firmware table is separate from the drawing and is not an electrical validation of it.
+- Shows the exact supplied circuit image in the app and below as an **unverified example circuit for PIC16F84A**. The selected board/PIC firmware connection table is separate and may not match the example.
 
 See the [User Guide](docs/USER_GUIDE.md) for the application workflow and board-specific notes.
 
@@ -36,9 +36,13 @@ See the [User Guide](docs/USER_GUIDE.md) for the application workflow and board-
 
 Use only a programmer circuit and supply that are documented for your exact hardware revision. Confirm every connection against the board documentation and the target PIC datasheet before applying power.
 
-The bundled Nano firmware profile uses D2 for switched target VDD, A1 as a **low-voltage VPP-switch control**, D4 for PGC/clock, D7 for bidirectional PGD/data, and A5 for the activity LED. A1 does not generate or tolerate programming voltage: **never connect VPP directly to A1 or any Arduino GPIO**. The external switching circuit must route VPP to MCLR/VPP. Join grounds as required by the verified hardware and place the target's required decoupling capacitor (typically 100 nF) between VDD and VSS.
+The bundled ProgramPic firmware communicates with the app at **9600 baud**. This is separate from Arduino bootloader upload speed. The Nano hardware profile uses D2 for switched target VDD, A1 as a **low-voltage VPP-switch control**, D4 for PGC/clock, D7 for bidirectional PGD/data, and A5 for the activity LED. A1 does not generate or tolerate programming voltage: **never connect VPP directly to A1 or any Arduino GPIO**. The external switching circuit must route VPP to MCLR/VPP. Join grounds as required by the verified hardware and place the target's required decoupling capacitor (typically 100 nF) between VDD and VSS.
 
-The [user-supplied circuit image](assets/reference/circuit-reference.png) is an **unverified reference**, not a validated schematic or wiring instruction. It depicts a 24 V DC input and an LM317 regulator; it may not match the firmware pin map or the actual programmer. The project guide describes a 16–20 V input for the official shield—do not apply the image's 24 V input to that shield unless its own documentation explicitly permits it. Do not wire or power hardware from the image or app connection table alone. Verify the specific VPP circuit, voltage, polarity, and target limits independently.
+### Example circuit for PIC16F84A
+
+![User-supplied example circuit for PIC16F84A](assets/reference/circuit-reference.png)
+
+This is the exact user-supplied PNG displayed in the app. It is an **unverified example for PIC16F84A**, not a validated schematic or wiring instruction. It depicts a 24 V DC input and an LM317 regulator with a marked 13 V output; it may not match the firmware pin map or the actual programmer. The project guide describes a 16–20 V input for the official shield—do not apply the image's 24 V input to that shield unless its own documentation explicitly permits it. The image and the selected board/PIC firmware table are separate references; neither certifies the other. Verify the exact circuit, VPP voltage and polarity, target package, and datasheet independently before applying power.
 
 The application does not measure socket voltage. The upstream host does not expose raw silicon ID/configuration values to the UI, and a manual selection cannot electronically identify devices that have no silicon ID. A green connection state or successful software check is not proof that the target wiring or voltage is safe.
 
@@ -46,9 +50,9 @@ The application does not measure socket voltage. The upstream host does not expo
 
 1. Install the Windows x64 app from the [latest release](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases/latest) and verify its SHA-256 sidecar.
 2. Connect a supported Arduino board by USB. Select its board type and serial port.
-3. Use **Programmer → Install/Update ProgramPic Firmware…** to install the bundled firmware when appropriate. Leonardo/Micro firmware upload from this app is unsupported; use Arduino IDE for those boards.
+3. Use **Programmer → Install/Update ProgramPic Firmware…** to install the bundled firmware. It uses a 9600-baud runtime link; previously installed builds using a different speed must be reflashed before connecting. Leonardo/Micro firmware upload from this app is unsupported; use Arduino IDE for those boards.
 4. Select the exact PIC model and load its `.hex` file. Check the package, pinout, supply, and VPP circuit against their documentation.
-5. Connect to the programmer, run the available detection/checks, and complete the on-screen preflight. Review the exact operation before confirming. Back up data first when possible.
+5. Connect to the programmer at 9600 baud, run the available detection/checks, and complete the on-screen preflight. Review the exact operation before confirming. Back up data first when possible.
 
 For detailed operating instructions, safety notes, and target-specific guidance, read the [User Guide](docs/USER_GUIDE.md). The app's preflight and confirmations are safeguards, not substitutes for hardware validation.
 
