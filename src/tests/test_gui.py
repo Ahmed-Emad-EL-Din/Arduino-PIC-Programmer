@@ -54,16 +54,14 @@ class TestGUIIntegration(unittest.TestCase):
     def test_ch340_handshake_failure_has_actionable_firmware_guidance(self):
         message = MainWindow._actionable_operation_error(
             "Connect Programmer",
-            "COM4: no ProgramPic response after 10 seconds at 9600 baud.",
+            "COM4: no ProgramPic response after 10 seconds at 115200 baud.",
         )
-        self.assertIn("Install Firmware", message)
-        self.assertIn("retries both standard Nano rates", message)
-        self.assertIn("CH340/CH341", message)
-        self.assertIn("9600", message)
+        self.assertIn("install firmware", message.lower())
+        self.assertIn("115200", message)
 
     def test_main_window_initialization(self):
         self.assertEqual(self.win.settings.theme, "dark")
-        self.assertEqual(self.win.settings.baud, 9600)
+        self.assertEqual(self.win.settings.baud, 115200)
         self.assertFalse(self.win.brand_icon.pixmap().isNull())
         self.assertFalse(self.win.log_dock.isVisible())
         toolbar = self.win.findChild(QToolBar, "mainToolbar")
@@ -76,16 +74,16 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertIsNotNone(self.win.log_pane)
         self.assertIsNotNone(self.win.cmb_board)
         self.assertIsNotNone(self.win.cmb_mcu)
-        self.assertIn("not measured", self.win.status_lbl.text())
-        self.assertIn("Raw silicon ID", self.win.btn_detect.toolTip())
+        self.assertEqual(self.win.status_lbl.text(), "Idle")
+        self.assertIn("model", self.win.btn_detect.toolTip())
         self.assertEqual(self.win.btn_erase.toolTip(), "Connect the programmer first.")
-        self.assertIn("Target selected:", self.win.chip_target.toolTip())
+        self.assertIn("PIC:", self.win.chip_target.toolTip())
         self.win.cmb_port.clear()
         self.win.cmb_port.addItem("No serial ports detected", "")
         self.win._refresh_actions()
         self.assertFalse(self.win.btn_connect.isEnabled())
         self.assertEqual(self.win.btn_rescan.objectName(), "primary")
-        self.assertIn("No serial port found", self.win.lbl_connection_guidance.text())
+        self.assertIn("No port found", self.win.lbl_connection_guidance.text())
         self.assertFalse(self.win.target_tools_panel.isVisible())
         capture_window(self.win, "main-dark-no-hardware.png")
 
@@ -149,6 +147,9 @@ class TestGUIIntegration(unittest.TestCase):
             w = 0x3000 | (i & 0xFF)
             img.data[i * 2] = w & 0xFF
             img.data[i * 2 + 1] = (w >> 8) & 0xFF
+        # Include the PIC16F84A config word so this fixture has no missing-fuse warning.
+        img.data[0x400E] = 0xFF
+        img.data[0x400F] = 0x3F
         self.win.hex_img = img
         self.win.hex_path = "/demo/blink_pic16f84a.hex"
         self.win.session.state.verified = True
@@ -163,8 +164,7 @@ class TestGUIIntegration(unittest.TestCase):
             "does not verify target identity",
             self.win.circuit_panel.hex_summary_lbl.text(),
         )
-        self.assertIn("Addresses fit", self.win.lbl_hex_guidance.text())
-        self.assertIn("does not verify target identity", self.win.lbl_hex_guidance.text())
+        self.assertIn("HEX fits", self.win.lbl_hex_guidance.text())
         capture_window(self.win, "hex-inspector-dark.png")
 
     def test_out_of_range_hex_disables_program_when_connected(self):
@@ -198,7 +198,7 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertFalse(self.win.btn_program.isEnabled())
         self.assertTrue(self.win.btn_detect.isEnabled())
         self.assertEqual(self.win.btn_detect.objectName(), "primary")
-        self.assertIn("Blocked:", self.win.lbl_target_guidance.text())
+        self.assertIn("last detected PIC12F675", self.win.lbl_target_guidance.text())
 
     def test_close_defers_until_active_hardware_worker_exits(self):
         started = threading.Event()
@@ -325,8 +325,30 @@ class TestGUIIntegration(unittest.TestCase):
         self.win.apply_theme("light", 10)
         self.assertEqual(self.win.settings.theme, "light")
         capture_window(self.win, "main-light-no-hardware.png")
+
+        self.win.settings.theme = "high_contrast"
+        self.win.apply_theme("high_contrast", self.win.settings.font_size)
+        self.assertEqual(self.win.circuit_panel._theme, "high_contrast")
+        self.assertIn("#ffff00", self.win.circuit_panel.schem_view.svg_bytes.decode("utf-8"))
+        capture_window(self.win, "main-high-contrast-no-hardware.png")
+
         self.win.settings.theme = "dark"
         self.win.apply_theme("dark", self.win.settings.font_size)
+
+    def test_primary_controls_have_clear_accessible_names(self):
+        expected = {
+            self.win.btn_connect: "Connect programmer",
+            self.win.btn_detect: "Detect PIC target",
+            self.win.btn_open_hex: "Open HEX file",
+            self.win.btn_program: "Program PIC from selected HEX file",
+            self.win.btn_verify: "Verify PIC against selected HEX file",
+            self.win.status_lbl: "Operation status",
+            self.win.progress: "Operation progress",
+            self.win.circuit_panel.tabs: "Programmer reference and data views",
+        }
+        for widget, name in expected.items():
+            with self.subTest(name=name):
+                self.assertEqual(widget.accessibleName(), name)
 
     def test_circuit_drawer_integration(self):
         # Ensure circuit drawer produces valid SVG for the panel

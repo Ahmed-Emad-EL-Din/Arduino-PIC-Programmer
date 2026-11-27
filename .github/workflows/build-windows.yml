@@ -106,8 +106,7 @@ jobs:
             "$Internal/tools/avrdude/avrdude.exe",
             "$Internal/tools/avrdude/avrdude.conf",
             "$Internal/docs/USER_GUIDE.md",
-            "$Internal/assets/reference/ArdPicProg_1_8_horo.png",
-            "$Internal/assets/reference/ArdPicProg.jpg",
+            "$Internal/assets/reference/user-circuit-diagram.drawio",
             "$Internal/assets/app-icon.ico",
             "$Internal/licenses/LICENSE",
             "$Internal/licenses/LGPL-3.0.txt",
@@ -119,9 +118,9 @@ jobs:
             if (!(Test-Path $Path)) { throw "Required package file missing: $Path" }
           }
           $AllowedData = @{
-            "$Internal/firmware" = @('precompiled/uno.hex', 'precompiled/nano_new.hex', 'precompiled/nano_old.hex', 'precompiled/pro_mini_5v.hex', 'precompiled/mega2560.hex', 'precompiled/leonardo.hex', 'precompiled/micro.hex')
+            "$Internal/firmware" = @('precompiled/uno.hex', 'precompiled/nano_new.hex', 'precompiled/nano_old.hex', 'precompiled/pro_mini_5v.hex', 'precompiled/mega2560.hex', 'precompiled/leonardo.hex', 'precompiled/micro.hex', 'source/ProgramPic/ProgramPic.ino')
             "$Internal/docs" = @('USER_GUIDE.md')
-            "$Internal/assets" = @('app-icon.ico', 'reference/ArdPicProg.jpg', 'reference/ArdPicProg_1_8_horo.png')
+            "$Internal/assets" = @('app-icon.ico', 'reference/user-circuit-diagram.drawio')
           }
           foreach ($Root in $AllowedData.Keys) {
             $AbsoluteRoot = (Resolve-Path $Root).Path
@@ -219,6 +218,30 @@ jobs:
             $Process.Refresh()
             if (!$Process.HasExited) { Stop-Process -Id $Process.Id -Force }
           }
+
+      - name: Install WinApp CLI for UI Automation
+        shell: pwsh
+        run: |
+          winget install --id Microsoft.WinAppCli --exact --version 0.7.1 --source winget `
+            --silent --accept-source-agreements --accept-package-agreements
+          if ($LASTEXITCODE -ne 0) { throw 'Could not install the pinned WinApp CLI 0.7.1.' }
+          $WinGetLinks = Join-Path $env:LOCALAPPDATA 'Microsoft/WinGet/Links'
+          if (Test-Path $WinGetLinks) {
+            $WinGetLinks | Add-Content $env:GITHUB_PATH
+            $env:PATH = "$WinGetLinks;$env:PATH"
+          }
+          if (!(Get-Command winapp -ErrorAction SilentlyContinue)) {
+            throw 'WinApp CLI installed but winapp.exe is not on PATH.'
+          }
+          winapp --version
+
+      - name: Check packaged app accessibility with WinApp UI Automation
+        shell: pwsh
+        run: |
+          $Exe = (Resolve-Path 'dist/Arduino-PIC-Programmer/Arduino-PIC-Programmer.exe').Path
+          ./scripts/check_ui_accessibility.ps1 -ApplicationPath $Exe
+          if ($LASTEXITCODE -ne 0) { throw 'WinApp UI Automation check failed.' }
+          'WinApp UI Automation found the main workbench controls.' | Add-Content $env:GITHUB_STEP_SUMMARY
 
       - name: Install Inno Setup compiler
         shell: pwsh

@@ -67,23 +67,18 @@ def build_dynamic_preflight(dev: McuDevice, board_key: str = "uno") -> List[Pref
     items: List[PreflightItem] = [
         PreflightItem(
             "port_exclusive",
-            f"Port belongs to {bw.board_name} running ProgramPic v1.8.horo, "
-            "and Arduino Serial Monitor / MPLAB / QPICkit are closed.",
+            f"Port belongs to {bw.board_name} running ProgramPic; other serial apps are closed.",
         ),
         PreflightItem(
             "firmware_wiring",
-            f"Bundled firmware wiring: {bw.vdd_pin}=VDD, {bw.mclr_pin}=MCLR/VPP switch "
-            f"control (HIGH=reset/VPP off; LOW=select VPP), {bw.clk_pin}=clock, "
-            f"{bw.data_pin}=data, {bw.activity_pin}=activity LED. "
-            f"{bw.mclr_pin} is logic-only: never "
-            "connect the external VPP rail directly to an Arduino pin. Common ground; "
-            "100 nF across target VDD/VSS.",
+            f"Wiring: {bw.vdd_pin}=VDD, {bw.mclr_pin}=MCLR/VPP control "
+            f"(HIGH=reset/VPP off; LOW=select VPP), {bw.clk_pin}=clock, "
+            f"{bw.data_pin}=data, {bw.activity_pin}=LED. Never connect VPP to an Arduino pin. "
+            "Common ground; 100 nF across target VDD/VSS.",
         ),
         PreflightItem(
             "vpp_rail",
-            "External programming voltage is wired only through the intended "
-            "MCLR/VPP switching circuit; verify supply polarity and that the "
-            "VPP rail is off before handling the PIC.",
+            "VPP is wired through the MCLR switch with correct polarity and is off before handling the PIC.",
         ),
     ]
 

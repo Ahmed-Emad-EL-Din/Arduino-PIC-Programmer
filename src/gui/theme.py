@@ -18,6 +18,7 @@ class ThemeTokens:
     warning: str
     warning_surface: str
     accent_hover: str
+    on_accent: str
 
 
 def tokens_for(theme: str) -> ThemeTokens:
@@ -26,12 +27,18 @@ def tokens_for(theme: str) -> ThemeTokens:
         return ThemeTokens(
             "light", "#f3f6fa", "#ffffff", "#e9eff6", "#17212e",
             "#536579", "#cbd5e1", "#175ea8", "#16734f", "#b4232d",
-            "#825b00", "#fff6df", "#124f8d",
+            "#825b00", "#fff6df", "#124f8d", "#ffffff",
+        )
+    if theme == "high_contrast":
+        return ThemeTokens(
+            "high_contrast", "#000000", "#000000", "#000000", "#ffffff",
+            "#ffffff", "#ffffff", "#ffff00", "#00ff00", "#ff6b6b",
+            "#ffff00", "#000000", "#ffffff", "#000000",
         )
     return ThemeTokens(
         "dark", "#101722", "#182231", "#202d3f", "#edf3fa",
         "#a8b7c8", "#394b60", "#3478c7", "#3ac99a", "#ff7272",
-        "#f0bd62", "#302817", "#2867ad",
+        "#f0bd62", "#302817", "#2867ad", "#ffffff",
     )
 
 
@@ -49,41 +56,43 @@ def build_qss(t: ThemeTokens, font_size: int = 10) -> str:
     QLabel#warn {{ color: {t.warning}; font-weight: 600; }}
     QLabel#monoSmall {{ color: {t.subtext}; font-family: 'Consolas', 'DejaVu Sans Mono', monospace; font-size: {max(8, font_size - 1)}pt; }}
     QLabel#sectionLabel {{ font-weight: 650; }}
-    QLabel#stepNum, QLabel#modeBadge {{ background: {t.raised}; border: 1px solid {t.border}; border-radius: 6px; padding: 3px; font-weight: 700; }}
+    QLabel#stepNum, QLabel#modeBadge {{ background: {t.raised}; border: 1px solid {t.border}; border-radius: 6px; padding: 4px; font-weight: 700; }}
     QLabel#chip {{ background: {t.raised}; border: 1px solid {t.border}; border-radius: 6px; padding: 4px 8px; }}
     QLabel#chipOk {{ color: {t.success}; background: {t.surface}; border: 1px solid {t.success}; border-radius: 6px; padding: 4px 8px; }}
     QLabel#chipWarn {{ color: {t.warning}; background: {t.warning_surface}; border: 1px solid {t.warning}; border-radius: 6px; padding: 4px 8px; }}
     QLabel#chipBad {{ color: {t.danger}; background: {t.surface}; border: 1px solid {t.danger}; border-radius: 6px; padding: 4px 8px; }}
-    QLabel#guidance {{ color: {t.subtext}; padding: 5px 8px; }}
-    QLabel#guidanceWarn {{ color: {t.warning}; background: {t.warning_surface}; border-left: 3px solid {t.warning}; border-radius: 4px; padding: 7px 9px; }}
-    QLabel#guidanceOk {{ color: {t.success}; background: {t.surface}; border-left: 3px solid {t.success}; border-radius: 4px; padding: 7px 9px; }}
-    QToolButton#disclosureButton {{ color: {t.accent}; background: transparent; border: 0; padding: 5px 2px; font-weight: 600; }}
+    QLabel#guidance {{ color: {t.subtext}; padding: 4px 8px; }}
+    QLabel#guidanceWarn {{ color: {t.warning}; background: {t.warning_surface}; border-left: 4px solid {t.warning}; border-radius: 4px; padding: 8px; }}
+    QLabel#guidanceOk {{ color: {t.success}; background: {t.surface}; border-left: 4px solid {t.success}; border-radius: 4px; padding: 8px; }}
+    QToolButton#disclosureButton {{ color: {t.accent}; background: transparent; border: 0; padding: 4px; font-weight: 600; }}
     QToolButton#disclosureButton:hover {{ color: {t.accent_hover}; }}
     QFrame#targetToolsPanel {{ background: {t.raised}; border: 1px solid {t.border}; border-radius: 6px; }}
-    QPushButton {{ background: {t.raised}; border: 1px solid {t.border}; border-radius: 6px; padding: 7px 11px; min-height: 22px; }}
+    QPushButton {{ background: {t.raised}; border: 1px solid {t.border}; border-radius: 6px; padding: 8px 12px; min-height: 24px; }}
     QPushButton:hover {{ border-color: {t.accent}; }}
     QPushButton:pressed {{ background: {t.border}; }}
-    QPushButton:focus, QComboBox:focus, QLineEdit:focus, QSpinBox:focus, QCheckBox:focus {{ border: 2px solid {t.accent}; }}
+    QPushButton:focus, QToolButton:focus, QComboBox:focus, QLineEdit:focus,
+    QSpinBox:focus, QCheckBox:focus, QRadioButton:focus, QTabBar::tab:focus,
+    QPlainTextEdit:focus, QTextBrowser:focus, QTableWidget:focus {{ border: 2px solid {t.accent}; }}
     QPushButton:disabled {{ color: {t.subtext}; background: {t.bg}; border-color: {t.border}; }}
-    QPushButton#primary {{ background: {t.accent}; color: #ffffff; border-color: {t.accent}; font-weight: 700; }}
+    QPushButton#primary {{ background: {t.accent}; color: {t.on_accent}; border-color: {t.accent}; font-weight: 700; }}
     QPushButton#primary:hover {{ background: {t.accent_hover}; border-color: {t.accent_hover}; }}
     QPushButton#primary:disabled {{ color: {t.subtext}; background: {t.raised}; border-color: {t.border}; }}
     QPushButton#dangerOutline {{ color: {t.danger}; }}
-    QLineEdit, QComboBox, QSpinBox, QPlainTextEdit, QTextBrowser, QTableWidget {{ background: {t.surface}; border: 1px solid {t.border}; border-radius: 5px; padding: 5px; selection-background-color: {t.accent}; }}
+    QLineEdit, QComboBox, QSpinBox, QPlainTextEdit, QTextBrowser, QTableWidget {{ background: {t.surface}; border: 1px solid {t.border}; border-radius: 5px; padding: 4px; selection-background-color: {t.accent}; selection-color: {t.on_accent}; }}
     QComboBox::drop-down {{ border: 0; width: 24px; }}
     QCheckBox {{ spacing: 8px; }}
     QCheckBox::indicator {{ width: 16px; height: 16px; }}
     QProgressBar {{ background: {t.raised}; border: 1px solid {t.border}; border-radius: 5px; text-align: center; min-height: 12px; }}
     QProgressBar::chunk {{ background: {t.accent}; border-radius: 4px; }}
-    QHeaderView::section {{ background: {t.raised}; padding: 6px; border: 0; }}
+    QHeaderView::section {{ background: {t.raised}; padding: 8px; border: 0; }}
     QTabWidget::pane {{ border: 1px solid {t.border}; border-radius: 6px; }}
-    QTabBar::tab {{ background: {t.raised}; border: 1px solid {t.border}; padding: 7px 12px; }}
+    QTabBar::tab {{ background: {t.raised}; border: 1px solid {t.border}; padding: 8px 12px; }}
     QTabBar::tab:selected {{ background: {t.surface}; border-bottom-color: {t.accent}; }}
-    QDockWidget::title {{ background: {t.surface}; padding: 7px; }}
-    QToolBar {{ background: {t.surface}; border: 0; spacing: 5px; padding: 5px; }}
+    QDockWidget::title {{ background: {t.surface}; padding: 8px; }}
+    QToolBar {{ background: {t.surface}; border: 0; spacing: 4px; padding: 4px; }}
     QMenu {{ background: {t.surface}; border: 1px solid {t.border}; }}
     QMenu::item:selected {{ background: {t.raised}; }}
-    QToolTip {{ color: {t.text}; background: {t.surface}; border: 1px solid {t.border}; padding: 5px; }}
+    QToolTip {{ color: {t.text}; background: {t.surface}; border: 1px solid {t.border}; padding: 4px; }}
     QScrollBar:vertical {{ width: 12px; background: {t.bg}; margin: 0; }}
     QScrollBar::handle:vertical {{ background: {t.border}; border-radius: 5px; min-height: 24px; }}
     QScrollBar::handle:vertical:hover {{ background: {t.subtext}; }}

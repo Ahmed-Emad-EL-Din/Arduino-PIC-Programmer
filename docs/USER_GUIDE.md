@@ -24,7 +24,7 @@ The firmware uploaded by this app uses the following Arduino Nano wiring. The up
 
 Use an Arduino (Nano / Uno / Pro Mini / Mega / Leonardo) and a PIC target. The pin assignments above are the firmware profile; check the exact board pin aliases and PIC package datasheet before wiring. The VPP switching circuit—not A1 itself—must route the external programming voltage to MCLR/VPP. Keep the PIC's documented VPP input isolated from Arduino GPIO and verify supply polarity/voltage before attaching a device.
 
-The upstream Ho-Ro hardware reference is available [here](https://github.com/Ho-Ro/ArdPicProg/blob/master/ArdPicProg_1_8_horo.png), but its wiring may not match this custom firmware profile.
+The user-supplied circuit reference is shown in the app's Circuit Reference tab and in the repository README. It is an unverified drawing; use the firmware pin map and device datasheet for wiring, and independently verify VPP before connecting a target.
 
 For a PIC16F84A in the published ZIF shield, JP3 is commonly set to 1-2; an 8-pin PIC such as PIC12F675 may require JP3=2-3. Confirm the exact board schematic before selecting jumper positions.
 
@@ -73,7 +73,7 @@ The app must not be considered production-ready until Windows and physical-devic
   Connect/Disconnect (`Ctrl+P`), Detect Chip (`F6`), Device Info,
   Erase…, Program… (`Ctrl+R`), Verify, Read
 * **Settings** — Connection (port/baud/board/MCU), Appearance
-  (dark/light, font size), Safety (confirmations, auto-verify)
+  (dark/light/high contrast, font size), Safety (confirmations, auto-verify)
 * **View** — Show Log (`Ctrl+L`), Zoom In/Out (`Ctrl +/-`), Reset,
   Toggle Theme (`Ctrl+T`)
 * **Help** — User Guide, Wiring Diagram, ProgramPic Firmware Help,
@@ -83,7 +83,7 @@ The app must not be considered production-ready until Windows and physical-devic
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| “No ProgramPic response” / “did not find a compatible PIC programmer” | ProgramPic not uploaded, wrong COM port/host-link speed, or serial port busy | CH340/CH341 clones use their normal `COMx` port. Install ProgramPic firmware, then connect using the ProgramPic host-link speed (9600 baud by default). Close Serial Monitor before connecting. If no COM port appears, install the WCH CH340/CH341 driver and rescan. |
+| No ProgramPic response | Firmware missing, wrong port, or port busy | Install ProgramPic and reconnect at 115200 baud. Close other serial apps; rescan if the port is missing. |
 | “No response from the Arduino” | Wrong port / firmware missing / Serial Monitor open | Rescan ports, flash firmware, close Serial Monitor |
 | “avrdude failed — not in sync” | Wrong board variant or port | Try Nano *Old Bootloader*; press reset and retry |
 | `DEVICE failed` | Empty socket, VPP off, chip backwards | Check red VPP LED, pin-1 orientation, lever |
@@ -92,7 +92,7 @@ The app must not be considered production-ready until Windows and physical-devic
 | Port busy / access denied | Another program using the port | Close MPLAB/QPICkit/Serial Monitor |
 | HEX “outside memory map” | HEX from a different MCU | Load the HEX built for your selected target |
 
-Arduino Nano firmware uploads use the AVR bootloader speed, which is separate from the 9600-baud ProgramPic-to-app link: new Nano bootloaders use 115200 baud and old bootloaders use 57600 baud. The app retries the other standard Nano rate after a bootloader synchronization failure; 9600 baud is not a standard Nano bootloader upload rate. If both attempts fail, copy the error details and check the reset circuit, selected COM port, and whether another application has the port open.
+The ProgramPic-to-app link and Nano upload both try 115200 baud first. Nano upload retries at 57600 if synchronization fails. If upload fails, check the selected port and close other serial apps.
 
 For an unexpected operation error, use **Copy details** in the error dialog and share that text along with the exported Activity Log. The full rotating diagnostic log is saved at the path shown in the error dialog (up to 2 MB per file, with three backups). If a hardware operation is active when you close the app, the app requests cancellation and stays open until the serial host exits safely; do not force-terminate it while it is writing to a PIC.
 

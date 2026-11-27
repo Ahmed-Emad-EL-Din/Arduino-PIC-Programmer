@@ -37,6 +37,15 @@ _LIGHT_LEVELS = {
     "RX": "#7c3aed",
 }
 
+_HIGH_CONTRAST_LEVELS = {
+    "INFO": "#ffffff",
+    "OK": "#00ff00",
+    "WARN": "#ffff00",
+    "ERR": "#ff6b6b",
+    "TX": "#00ffff",
+    "RX": "#ff80ff",
+}
+
 
 class LogPane(QWidget):
     def __init__(self, parent=None) -> None:
@@ -48,6 +57,7 @@ class LogPane(QWidget):
 
         self._view = QPlainTextEdit(self)
         self._view.setObjectName("log")
+        self._view.setAccessibleName("Activity log messages")
         self._view.setReadOnly(True)
         self._view.setMaximumBlockCount(5000)
         font = QFont("DejaVu Sans Mono")
@@ -64,6 +74,7 @@ class LogPane(QWidget):
         head.addStretch()
 
         self._filter = QComboBox()
+        self._filter.setAccessibleName("Filter activity log")
         self._filter.addItem("All messages", "ALL")
         self._filter.addItem("Warnings & errors", "WARN_ERR")
         self._filter.addItem("Errors only", "ERR")
@@ -72,12 +83,15 @@ class LogPane(QWidget):
         head.addWidget(self._filter)
 
         copy = QPushButton("Copy")
+        copy.setAccessibleName("Copy all activity log messages")
         copy.setFixedHeight(26)
         copy.clicked.connect(self._copy_all)
         clear = QPushButton("Clear")
+        clear.setAccessibleName("Clear activity log")
         clear.setFixedHeight(26)
         clear.clicked.connect(self._clear_all)
         save = QPushButton("Export…")
+        save.setAccessibleName("Export activity log")
         save.setFixedHeight(26)
         save.clicked.connect(self._save)
         for b in (copy, clear, save):
@@ -113,10 +127,15 @@ class LogPane(QWidget):
         return True
 
     def _append_formatted(self, ts: str, lvl: str, msg: str) -> None:
-        is_light = self._theme == "light"
-        levels = _LIGHT_LEVELS if is_light else _DARK_LEVELS
-        ts_col = "#64748b" if is_light else "#64748b"
-        body_col = "#0f172a" if is_light else "#dbe2ef"
+        if self._theme == "high_contrast":
+            levels = _HIGH_CONTRAST_LEVELS
+            ts_col = body_col = "#ffffff"
+        elif self._theme == "light":
+            levels = _LIGHT_LEVELS
+            ts_col, body_col = "#64748b", "#0f172a"
+        else:
+            levels = _DARK_LEVELS
+            ts_col, body_col = "#94a0b8", "#dbe2ef"
         color = levels.get(lvl, levels["INFO"])
         safe = html.escape(msg).replace("\n", "<br>")
         self._view.appendHtml(

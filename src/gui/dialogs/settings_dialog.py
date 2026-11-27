@@ -15,8 +15,12 @@ class SettingsDialog(QDialog):
         self.theme = QComboBox()
         self.theme.addItem("Dark", "dark")
         self.theme.addItem("Light", "light")
+        self.theme.addItem("High contrast", "high_contrast")
         self.theme.setCurrentIndex(max(0, self.theme.findData(settings.theme)))
-        self.theme.setToolTip("Changes appearance only; status text remains explicit in both themes.")
+        self.theme.setToolTip(
+            "Changes appearance only. The manual high-contrast palette uses a black background, "
+            "white text, and bright focus/status colors."
+        )
         form.addRow("Appearance:", self.theme)
         self.board = QComboBox()
         for board in BOARDS:
@@ -34,7 +38,7 @@ class SettingsDialog(QDialog):
         self.baud = QSpinBox()
         self.baud.setRange(9600, 1000000)
         self.baud.setValue(settings.baud)
-        self.baud.setToolTip("ProgramPic host-link speed; default firmware now uses 9600 baud. This is separate from the Nano bootloader upload speed.")
+        self.baud.setToolTip("ProgramPic serial link. Default: 115200 baud.")
         form.addRow("Serial speed:", self.baud)
         self.verify = QCheckBox("Read back and compare after programming")
         self.verify.setChecked(settings.auto_verify)
