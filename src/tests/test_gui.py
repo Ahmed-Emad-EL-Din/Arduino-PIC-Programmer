@@ -59,6 +59,16 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertIn("install firmware", message.lower())
         self.assertIn("9600", message)
 
+    def test_readback_mismatch_has_safe_hardware_troubleshooting(self):
+        message = MainWindow._actionable_operation_error(
+            "Program PIC16F84A",
+            "ProtocolError: Read-back verification failed: 0x0000: expected 2801, got 1FFF",
+        )
+        self.assertIn("cannot confirm", message)
+        self.assertIn("Keep read-back verification enabled", message)
+        self.assertIn("confirm VPP is off", message)
+        self.assertIn("Point-to-Point Wiring", message)
+
     def test_main_window_initialization(self):
         self.assertEqual(self.win.settings.theme, "dark")
         self.assertEqual(self.win.settings.baud, 9600)

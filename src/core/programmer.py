@@ -219,16 +219,6 @@ class ProgrammerSession:
         # present the database's expected ID as if it were a measured value.
         return DeviceInfo(device_name=device.display_name), device
 
-    @staticmethod
-    def _write_temp_hex(image: HexImage) -> Path:
-        handle = tempfile.NamedTemporaryFile(prefix="ardpicprog-", suffix=".hex", delete=False)
-        path = Path(handle.name)
-        try:
-            handle.write(image.to_hex().encode("ascii"))
-        finally:
-            handle.close()
-        return path
-
     def _readback(self, dev: McuDevice, progress: Progress = None,
                   check_cancel: bool = True) -> HexImage:
         port = self._require_connected()
@@ -257,7 +247,8 @@ class ProgrammerSession:
                 break
         if mismatches:
             detail = ", ".join(
-                f"0x{addr:04X}: expected {want:04X}, got {got if got is not None else 'missing'}"
+                f"0x{addr:04X}: expected {want:04X}, got {got:04X}"
+                if got is not None else f"0x{addr:04X}: expected {want:04X}, got missing"
                 for addr, want, got in mismatches
             )
             raise ProtocolError("Read-back verification failed: " + detail)
@@ -269,22 +260,27 @@ class ProgrammerSession:
         gate_hex_fits(image.to_flat(), dev)
         if pct:
             pct(0, 1)
-        source = self._write_temp_hex(image)
-        try:
+        with tempfile.TemporaryDirectory(prefix="ardpicprog-program-") as directory:
+            source = Path(directory) / "input.hex"
+            source.write_text(image.to_hex(), encoding="ascii")
             args = ["--pic-serial-port", port, "--device", dev.name, "--erase", "--burn",
                     "--input-hexfile", str(source)]
+            readback_path = Path(directory) / "readback.hex"
             if force_calibration:
                 args.append("--force-calibration")
+            if do_verify:
+                # Keep programming and verification in one ArdPicProg session.
+                # Reopening the COM port between them toggles Nano DTR/reset and
+                # exits/re-enters PIC programming mode unnecessarily.
+                if progress:
+                    progress("Programming and read-back verification in one host session…")
+                args.extend(["--output-hexfile", str(readback_path)])
             output = self._checked(args, progress)
-        finally:
-            source.unlink(missing_ok=True)
-        if do_verify:
-            if progress:
-                progress("Read-back verify: reading target and comparing written addresses…")
-            # Verification must still run if the user requested cancellation
-            # while the write subprocess was active; never skip post-write checks.
-            readback = self._readback(dev, progress, check_cancel=False)
-            self._compare(image, readback, dev)
+            if do_verify:
+                # Verification still runs after a deferred cancellation request;
+                # never report a write as complete without checking it.
+                readback = HexImage.load(readback_path)
+                self._compare(image, readback, dev)
         if pct:
             pct(1, 1)
         verification = (

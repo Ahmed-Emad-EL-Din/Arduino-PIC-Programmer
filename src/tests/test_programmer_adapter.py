@@ -55,18 +55,29 @@ class TestProgrammerAdapter(unittest.TestCase):
         self.assertIn("read-back comparison was disabled and not performed", result)
         readback.assert_not_called()
 
-    def test_program_result_reports_successful_readback_when_enabled(self):
+    def test_program_result_verifies_in_the_same_host_session(self):
         self.session.state = ProgrammerState(port="FAKEPORT", verified=True)
         image = HexImage.from_flat({0: 0x1234})
-        with patch.object(self.session, "_checked", return_value="program command completed"), \
-             patch.object(self.session, "_readback", return_value=image):
+
+        def run_host(args, progress=None, check_cancel=True):
+            output_path = Path(args[args.index("--output-hexfile") + 1])
+            output_path.write_text(image.to_hex(), encoding="ascii")
+            return "program and read-back completed"
+
+        with patch.object(self.session, "_checked", side_effect=run_host) as checked, \
+             patch.object(self.session, "_readback") as readback:
             result = self.session.program_hex(image, DEFAULT_DEVICE, do_verify=True)
         self.assertIn("read-back comparison passed", result)
+        command = checked.call_args.args[0]
+        self.assertIn("--input-hexfile", command)
+        self.assertIn("--output-hexfile", command)
+        readback.assert_not_called()
 
-    def test_readback_comparison_rejects_mismatch(self):
-        different = HexImage.from_flat({0: 0x1235})
-        with self.assertRaisesRegex(ProtocolError, "verification failed"):
+    def test_readback_comparison_rejects_mismatch_with_hex_values(self):
+        different = HexImage.from_flat({0: 0x1FFF})
+        with self.assertRaises(ProtocolError) as raised:
             self.session._compare(self.expected, different, DEFAULT_DEVICE)
+        self.assertIn("0x0000: expected 1234, got 1FFF", str(raised.exception))
 
 
 if __name__ == "__main__":

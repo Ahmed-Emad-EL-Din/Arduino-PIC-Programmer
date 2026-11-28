@@ -1,5 +1,5 @@
 """Application metadata."""
 APP_NAME = "Arduino-PIC Programmer"
 ORG_NAME = "Arduino-PIC-Programmer"
-VERSION = "2.2.3"
+VERSION = "2.2.6"
 GITHUB_URL = "https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer"

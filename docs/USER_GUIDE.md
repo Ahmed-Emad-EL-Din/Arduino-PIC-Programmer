@@ -88,7 +88,7 @@ The app must not be considered production-ready until Windows and physical-devic
 | “avrdude failed — not in sync” | Wrong board variant or port | Try Nano *Old Bootloader*; press reset and retry |
 | `DEVICE failed` | Empty socket, VPP off, chip backwards | Check red VPP LED, pin-1 orientation, lever |
 | Detected model differs from selected target | Wrong target selection or ambiguous host output | Stop; recheck package marking and selection. Raw ID values are not shown by the app. |
-| Verify failed after write | Unstable VPP, bad chip, wiring | Check 13 V supply/wiring; try another chip |
+| Read-back verification failed | The app could not confirm the PIC matches the HEX; this may be a write or read-path issue, unstable VDD/VPP, incorrect target, wiring, or a damaged device | Do not treat the chip as programmed or disable verification. Power down and confirm VPP is off before handling it; check the exact target marking/orientation and Point-to-Point Wiring against the board and PIC datasheets. If safe, measure target VDD and switched VPP at the socket; the app cannot measure them. Use a known-good device only after the circuit is confirmed. |
 | Port busy / access denied | Another program using the port | Close MPLAB/QPICkit/Serial Monitor |
 | HEX “outside memory map” | HEX from a different MCU | Load the HEX built for your selected target |
 
