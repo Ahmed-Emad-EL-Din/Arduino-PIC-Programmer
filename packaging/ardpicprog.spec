@@ -23,6 +23,7 @@ for path, destination in (
     (ROOT / "docs" / "USER_GUIDE.md", "docs"),
     (ROOT / "firmware" / "source" / "ProgramPic" / "ProgramPic.ino", "firmware/source/ProgramPic"),
     (ROOT / "assets" / "app-icon.ico", "assets"),
+    (ROOT / "assets" / "app-icon.png", "assets"),
     (ROOT / "assets" / "reference" / "circuit-reference.png", "assets/reference"),
     (ROOT / "tools" / "ardpicprog.exe", "tools"),
     (ROOT / "tools" / "avrdude" / "avrdude.exe", "tools/avrdude"),
