@@ -6,14 +6,22 @@ from typing import Callable, Optional
 
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt
 from PySide6.QtGui import QGuiApplication, QPixmap
-from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QGraphicsOpacityEffect,
+    QHBoxLayout,
+    QLabel,
+    QStackedLayout,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class StartupSplash(QWidget):
-    """A brief centered splash with a restrained fade transition."""
+    """A brief centered splash with a crisp logo and a soft gradient reveal."""
 
-    FADE_IN_MS = 220
-    FADE_OUT_MS = 240
+    GRADIENT_FADE_IN_MS = 520
+    FADE_OUT_MS = 220
     WIDTH = 390
     HEIGHT = 365
     LOGO_SIZE = 230
@@ -31,21 +39,44 @@ class StartupSplash(QWidget):
         self.setAccessibleName("Arduino-PIC Programmer startup")
         self.setAccessibleDescription("Application is starting")
 
-        card = QFrame(self)
-        card.setObjectName("splashCard")
-        card.setStyleSheet(
-            "QFrame#splashCard {"
+        # Keep the startup mark outside the animated background layer: the logo
+        # and attribution are full-strength from the very first painted frame.
+        stack = QStackedLayout(self)
+        stack.setContentsMargins(0, 0, 0, 0)
+        stack.setStackingMode(QStackedLayout.StackingMode.StackAll)
+
+        base = QFrame(self)
+        base.setObjectName("splashBase")
+        base.setStyleSheet(
+            "QFrame#splashBase { background-color: #08172b; "
+            "border: 1px solid rgba(54, 207, 226, 90); border-radius: 18px; }"
+        )
+        stack.addWidget(base)
+
+        gradient = QFrame(self)
+        gradient.setObjectName("splashGradient")
+        gradient.setStyleSheet(
+            "QFrame#splashGradient {"
             "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
-            "stop:0 #08172b, stop:1 #102943);"
+            "stop:0 #08172b, stop:0.48 #0b2037, stop:1 #102943);"
             "border: 1px solid rgba(54, 207, 226, 90);"
             "border-radius: 18px;"
             "}"
         )
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(28, 24, 28, 22)
-        layout.setSpacing(12)
+        self._gradient_opacity = QGraphicsOpacityEffect(gradient)
+        self._gradient_opacity.setOpacity(0.0)
+        gradient.setGraphicsEffect(self._gradient_opacity)
+        stack.addWidget(gradient)
 
-        logo = QLabel(card)
+        content = QWidget(self)
+        content.setObjectName("splashContent")
+        content.setStyleSheet("QWidget#splashContent { background: transparent; }")
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(26, 30, 26, 28)
+        content_layout.setSpacing(12)
+        content_layout.addStretch(1)
+
+        logo = QLabel(content)
         logo.setObjectName("splashLogo")
         logo.setAccessibleName("Arduino-PIC Programmer logo")
         logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -60,10 +91,9 @@ class StartupSplash(QWidget):
         else:
             logo.setText("Arduino-PIC Programmer")
             logo.setStyleSheet("color: #eef6ff; font-size: 17px; font-weight: 600;")
-        layout.addStretch(1)
-        layout.addWidget(logo, 0, Qt.AlignmentFlag.AlignCenter)
+        content_layout.addWidget(logo, 0, Qt.AlignmentFlag.AlignCenter)
 
-        credit = QLabel("Made By: Ahmed Emad", card)
+        credit = QLabel("Made By: Ahmed Emad", content)
         credit.setObjectName("splashCredit")
         credit.setAccessibleName("Made By: Ahmed Emad")
         credit.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -71,13 +101,15 @@ class StartupSplash(QWidget):
             "color: #aabbd0; background: transparent; border: none; "
             "font-size: 11px; font-weight: 500; letter-spacing: 0.3px;"
         )
-        layout.addWidget(credit, 0, Qt.AlignmentFlag.AlignCenter)
-        layout.addStretch(1)
+        credit_row = QHBoxLayout()
+        credit_row.addStretch(1)
+        credit_row.addWidget(credit)
+        credit_row.addStretch(1)
+        content_layout.addLayout(credit_row)
+        content_layout.addStretch(1)
+        stack.addWidget(content)
 
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.addWidget(card)
-
+        self._gradient_animation: Optional[QPropertyAnimation] = None
         self._fade_animation: Optional[QPropertyAnimation] = None
 
     def show_centered(self) -> None:
@@ -88,25 +120,29 @@ class StartupSplash(QWidget):
                 available.x() + (available.width() - self.width()) // 2,
                 available.y() + (available.height() - self.height()) // 2,
             )
-        self.setWindowOpacity(0.0)
+        # Do not fade the top-level window here: that would make the logo look
+        # washed out. Only the background gradient is animated in.
+        self.setWindowOpacity(1.0)
         self.show()
         self.raise_()
-        self._animate_opacity(1.0, self.FADE_IN_MS)
+        animation = QPropertyAnimation(self._gradient_opacity, b"opacity", self)
+        animation.setDuration(self.GRADIENT_FADE_IN_MS)
+        animation.setStartValue(0.0)
+        animation.setEndValue(1.0)
+        animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        animation.start()
+        self._gradient_animation = animation
 
     def fade_out(self, on_finished: Optional[Callable[[], None]] = None) -> None:
-        animation = self._animate_opacity(0.0, self.FADE_OUT_MS)
+        animation = QPropertyAnimation(self, b"windowOpacity", self)
+        animation.setDuration(self.FADE_OUT_MS)
+        animation.setStartValue(self.windowOpacity())
+        animation.setEndValue(0.0)
+        animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
         if on_finished is not None:
             animation.finished.connect(on_finished)
-
-    def _animate_opacity(self, target: float, duration_ms: int) -> QPropertyAnimation:
-        animation = QPropertyAnimation(self, b"windowOpacity", self)
-        animation.setDuration(duration_ms)
-        animation.setStartValue(self.windowOpacity())
-        animation.setEndValue(target)
-        animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
         animation.start()
         self._fade_animation = animation
-        return animation
 
 
 __all__ = ["StartupSplash"]

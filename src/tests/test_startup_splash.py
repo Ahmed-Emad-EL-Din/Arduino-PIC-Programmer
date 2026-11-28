@@ -6,7 +6,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtGui import QGuiApplication
-from PySide6.QtWidgets import QApplication, QLabel
+from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
 from gui.startup_splash import StartupSplash
 
@@ -25,9 +25,13 @@ class TestStartupSplash(unittest.TestCase):
         self.assertEqual(splash.size().height(), StartupSplash.HEIGHT)
         logo = splash.findChild(QLabel, "splashLogo")
         credit = splash.findChild(QLabel, "splashCredit")
+        gradient = splash.findChild(QWidget, "splashGradient")
         self.assertIsNotNone(logo)
         self.assertFalse(logo.pixmap().isNull())
+        self.assertIsNone(logo.graphicsEffect())
         self.assertEqual(credit.text(), "Made By: Ahmed Emad")
+        self.assertIsNotNone(gradient)
+        self.assertAlmostEqual(gradient.graphicsEffect().opacity(), 0.0)
 
         screen = QGuiApplication.primaryScreen()
         self.assertIsNotNone(screen)
