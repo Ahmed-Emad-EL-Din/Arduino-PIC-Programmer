@@ -108,6 +108,7 @@ jobs:
             "$Internal/docs/USER_GUIDE.md",
             "$Internal/assets/reference/circuit-reference.png",
             "$Internal/assets/app-icon.ico",
+            "$Internal/assets/app-icon.png",
             "$Internal/licenses/LICENSE",
             "$Internal/licenses/LGPL-3.0.txt",
             "$Internal/licenses/THIRD_PARTY_NOTICES.md",
@@ -120,7 +121,7 @@ jobs:
           $AllowedData = @{
             "$Internal/firmware" = @('precompiled/uno.hex', 'precompiled/nano_new.hex', 'precompiled/nano_old.hex', 'precompiled/pro_mini_5v.hex', 'precompiled/mega2560.hex', 'precompiled/leonardo.hex', 'precompiled/micro.hex', 'source/ProgramPic/ProgramPic.ino')
             "$Internal/docs" = @('USER_GUIDE.md')
-            "$Internal/assets" = @('app-icon.ico', 'reference/circuit-reference.png')
+            "$Internal/assets" = @('app-icon.ico', 'app-icon.png', 'reference/circuit-reference.png')
           }
           foreach ($Root in $AllowedData.Keys) {
             $AbsoluteRoot = (Resolve-Path $Root).Path
