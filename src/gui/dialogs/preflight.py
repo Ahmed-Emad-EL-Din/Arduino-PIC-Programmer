@@ -50,6 +50,7 @@ class PreflightDialog(QDialog):
         parent=None,
         previously_checked: bool = False,
         age_minutes: int = 0,
+        connection_verified: bool = False,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
@@ -103,8 +104,12 @@ class PreflightDialog(QDialog):
         self.check_all_button = QPushButton("Check all items")
         self.check_all_button.setObjectName("checkAllPreflight")
         self.check_all_button.setAccessibleName("Mark all physical preflight items checked")
+        self.check_all_button.setEnabled(connection_verified)
         self.check_all_button.setToolTip(
-            "Use only after you have physically inspected every listed wiring and safety item."
+            "Requires a verified Arduino connection. Use only after physically inspecting every item; "
+            "this confirmation is valid only during the current connection session."
+            if connection_verified else
+            "Connect and verify the Arduino before using Check all items."
         )
         self.clear_all_button = QPushButton("Clear all")
         self.clear_all_button.setAccessibleName("Clear all preflight checks")
@@ -160,6 +165,7 @@ def show_preflight(
     board_key: str = "uno",
     age_minutes: int = 0,
     expired: bool = False,
+    connection_verified: bool = False,
 ) -> bool:
     items = build_dynamic_preflight(dev, board_key)
     title = (
@@ -173,6 +179,7 @@ def show_preflight(
         items, title, subtitle, parent,
         previously_checked=seen and not expired,
         age_minutes=age_minutes,
+        connection_verified=connection_verified,
     )
     return dialog.exec() == QDialog.DialogCode.Accepted
 

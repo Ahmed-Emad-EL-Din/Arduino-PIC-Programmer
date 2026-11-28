@@ -373,7 +373,11 @@ class TestGUIIntegration(unittest.TestCase):
 
     def test_preflight_checklist_wraps_text_and_requires_every_confirmation(self):
         items = build_dynamic_preflight(lookup("pic16f84a"), "nano_new")
-        dialog = PreflightDialog(items, "Hardware preflight", "Check the physical setup", self.win)
+        dialog = PreflightDialog(
+            items, "Hardware preflight", "Check the physical setup", self.win,
+            connection_verified=True,
+        )
+        self.assertTrue(dialog.check_all_button.isEnabled())
         self.assertFalse(dialog.continue_button.isEnabled())
         self.assertEqual(len(dialog.check_labels), len(items))
         self.assertTrue(all(label.wordWrap() for label in dialog.check_labels))
@@ -396,6 +400,19 @@ class TestGUIIntegration(unittest.TestCase):
         self.assertFalse(dialog.continue_button.isEnabled())
         self.assertIsNotNone(dialog.findChild(QScrollArea, "preflightChecklistScroll"))
         dialog.close()
+
+    def test_check_all_requires_a_verified_arduino_connection(self):
+        items = build_dynamic_preflight(lookup("pic16f84a"), "uno")
+        dialog = PreflightDialog(items, "Hardware preflight", parent=self.win)
+        self.assertFalse(dialog.check_all_button.isEnabled())
+        self.assertIn("Connect and verify", dialog.check_all_button.toolTip())
+        dialog.close()
+
+        with patch("gui.main_window.show_preflight") as show:
+            self.win.session.disconnect()
+            self.assertFalse(self.win._ensure_preflight())
+            show.assert_not_called()
+        self.assertIn("only after the Arduino connection is verified", self.win.log_pane.text())
 
     def test_recent_preflight_is_reused_for_same_board_pic_and_port_until_ttl(self):
         self.win.session.state.verified = True

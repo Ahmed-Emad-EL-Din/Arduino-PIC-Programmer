@@ -26,6 +26,7 @@ class TestStartupSplash(unittest.TestCase):
         logo = splash.findChild(QLabel, "splashLogo")
         credit = splash.findChild(QLabel, "splashCredit")
         gradient = splash.findChild(QWidget, "splashGradient")
+        self.assertEqual(splash.layout().currentWidget().objectName(), "splashContent")
         self.assertIsNotNone(logo)
         self.assertFalse(logo.pixmap().isNull())
         self.assertIsNone(logo.graphicsEffect())

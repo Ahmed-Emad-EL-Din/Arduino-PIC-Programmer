@@ -1,5 +1,5 @@
 #define AppName "Arduino-PIC Programmer"
-#define AppVersion "2.2.8"
+#define AppVersion "2.2.9"
 #define AppPublisher "Ahmed Emad El-Din Hussein"
 #define AppExe "Arduino-PIC-Programmer.exe"
 
@@ -29,7 +29,7 @@ WizardStyle=modern
 SetupLogging=yes
 CloseApplications=yes
 RestartApplications=no
-VersionInfoVersion=2.2.8.0
+VersionInfoVersion=2.2.9.0
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription=Install {#AppName}
 VersionInfoProductName={#AppName}

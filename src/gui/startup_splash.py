@@ -108,6 +108,9 @@ class StartupSplash(QWidget):
         content_layout.addLayout(credit_row)
         content_layout.addStretch(1)
         stack.addWidget(content)
+        # In StackAll the current widget is painted above the other layers.
+        # Keep the logo/text on top of both background surfaces.
+        stack.setCurrentWidget(content)
 
         self._gradient_animation: Optional[QPropertyAnimation] = None
         self._fade_animation: Optional[QPropertyAnimation] = None

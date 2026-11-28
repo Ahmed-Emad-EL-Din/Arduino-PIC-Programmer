@@ -1251,6 +1251,12 @@ class MainWindow(QMainWindow):
     PREFLIGHT_TTL_SECONDS = 10 * 60
 
     def _ensure_preflight(self) -> bool:
+        if not self.session.connected:
+            self.log(
+                "Hardware preflight is available only after the Arduino connection is verified.",
+                "WARN",
+            )
+            return False
         port = self.session.state.port or str(self.cmb_port.currentData() or "")
         key = (self.board_key, self.target.name, port)
         now = time.monotonic()
@@ -1268,6 +1274,7 @@ class MainWindow(QMainWindow):
             board_key=self.board_key,
             age_minutes=age_minutes,
             expired=expired,
+            connection_verified=self.session.connected,
         ):
             self._preflight_verified_at[key] = time.monotonic()
             return True
