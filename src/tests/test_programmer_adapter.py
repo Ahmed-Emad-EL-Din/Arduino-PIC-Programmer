@@ -63,10 +63,11 @@ class TestProgrammerAdapter(unittest.TestCase):
             result = self.session.program_hex(image, DEFAULT_DEVICE, do_verify=True)
         self.assertIn("read-back comparison passed", result)
 
-    def test_readback_comparison_rejects_mismatch(self):
-        different = HexImage.from_flat({0: 0x1235})
-        with self.assertRaisesRegex(ProtocolError, "verification failed"):
+    def test_readback_comparison_rejects_mismatch_with_hex_values(self):
+        different = HexImage.from_flat({0: 0x1FFF})
+        with self.assertRaises(ProtocolError) as raised:
             self.session._compare(self.expected, different, DEFAULT_DEVICE)
+        self.assertIn("0x0000: expected 1234, got 1FFF", str(raised.exception))
 
 
 if __name__ == "__main__":

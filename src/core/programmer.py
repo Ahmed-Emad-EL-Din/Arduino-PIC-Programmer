@@ -257,7 +257,8 @@ class ProgrammerSession:
                 break
         if mismatches:
             detail = ", ".join(
-                f"0x{addr:04X}: expected {want:04X}, got {got if got is not None else 'missing'}"
+                f"0x{addr:04X}: expected {want:04X}, got {got:04X}"
+                if got is not None else f"0x{addr:04X}: expected {want:04X}, got missing"
                 for addr, want, got in mismatches
             )
             raise ProtocolError("Read-back verification failed: " + detail)

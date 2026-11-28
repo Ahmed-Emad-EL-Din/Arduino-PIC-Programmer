@@ -1144,6 +1144,17 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _actionable_operation_error(label: str, message: str) -> str:
         lowered = message.casefold()
+        if "read-back verification failed" in lowered:
+            return (
+                f"{message}\n\nThe app cannot confirm that the PIC contains the HEX image. "
+                "This can be caused by a write failure or by unstable target power, VPP, "
+                "clock/data wiring, target selection, or a damaged device. Keep read-back "
+                "verification enabled. Before retrying, power down and confirm VPP is off "
+                "before handling the PIC; check the exact PIC marking, socket orientation, "
+                "and the Point-to-Point Wiring tab against the board and device datasheets. "
+                "If you can safely measure the circuit, verify target VDD and switched VPP "
+                "at the PIC socket. The app cannot measure these voltages."
+            )
         if label == "Connect Programmer" and (
             "no programpic response" in lowered
             or "did not find a compatible pic programmer" in lowered
