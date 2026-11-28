@@ -28,8 +28,9 @@ class PreflightItem:
 # Static fallback checklist (for callers without specific MCU context)
 ZIF_PREFLIGHT: List[PreflightItem] = [
     PreflightItem("vpp_led",
-                  "13 V VPP programming supply is connected to JP1 (NEVER to "
-                  "the Arduino barrel jack!) and the VPP indicator LED is ON."),
+                  "External VPP supply is connected only through the intended "
+                  "MCLR/VPP switching circuit; verify polarity and VPP-off state. "
+                  "Never connect the VPP rail to an Arduino pin or power input."),
     PreflightItem("power",
                   "Arduino is powered via USB and will NOT be unplugged during "
                   "the operation."),
@@ -66,16 +67,26 @@ def build_dynamic_preflight(dev: McuDevice, board_key: str = "uno") -> List[Pref
     items: List[PreflightItem] = [
         PreflightItem(
             "port_exclusive",
-            f"Port belongs to {bw.board_name} running ProgramPic v1.8.horo, "
-            "and Arduino Serial Monitor / MPLAB / QPICkit are closed.",
+            f"Port belongs to {bw.board_name} running ProgramPic; other serial apps are closed.",
+        ),
+        PreflightItem(
+            "firmware_wiring",
+            f"Wiring: {bw.vdd_pin}=VDD, {bw.mclr_pin}=MCLR/VPP control "
+            f"(HIGH=reset/VPP off; LOW=select VPP), {bw.clk_pin}=clock, "
+            f"{bw.data_pin}=data, {bw.activity_pin}=LED. Never connect VPP to an Arduino pin. "
+            "Common ground; 100 nF across target VDD/VSS.",
         ),
         PreflightItem(
             "vpp_rail",
-            "External 13 V DC VPP supply is connected ONLY to programmer "
-            "header JP1 (polarity verified, red VPP LED lit — NEVER plugged "
-            "into the Arduino's power pin).",
+            "VPP is wired through the MCLR switch with correct polarity and is off before handling the PIC.",
         ),
     ]
+
+    if not dev.has_device_id:
+        items.append(PreflightItem(
+            "manual_no_id",
+            f"{dev.display_name} has no silicon Device ID. The programmer cannot electronically distinguish it from other no-ID PICs; verify the package marking and target selection before any erase or write.",
+        ))
 
     if pw.mode == MODE_ZIF_18:
         items.append(PreflightItem(
@@ -92,17 +103,25 @@ def build_dynamic_preflight(dev: McuDevice, board_key: str = "uno") -> List[Pref
             f"to 2-3 (routes D2 VDD to Pin 1 — wrong JP3 damages the chip!)."
         ))
     else:
-        vdd_s = ", ".join(str(p) for p in pw.vdd_pins)
-        vss_s = ", ".join(str(p) for p in pw.vss_pins)
-        pgm_s = (f", and Pin {pw.pgm_pin} (PGM) pulled to GND via 4.7 kΩ"
-                 if pw.pgm_pin else "")
-        items.append(PreflightItem(
-            "icsp_wiring",
-            f"{dev.display_name} ({pw.package}) is wired via ICSP / breadboard "
-            f"(NOT plugged into the 18-pin ZIF socket!): MCLR/VPP=Pin {pw.vpp_pin}, "
-            f"VDD=Pin {vdd_s} (+100nF), VSS=Pin {vss_s}, PGC=Pin {pw.pgc_pin} "
-            f"({bw.clk_pin}), PGD=Pin {pw.pgd_pin} ({bw.data_pin}){pgm_s}."
-        ))
+        if not pw.pinout_verified:
+            items.append(PreflightItem(
+                "datasheet_pinout",
+                f"Pin-level wiring for {dev.display_name} is not verified by this app. "
+                "Use the exact manufacturer's datasheet to identify every VDD, VSS, "
+                "MCLR/VPP, PGC, and PGD pin before connecting; do not rely on a generic diagram.",
+            ))
+        else:
+            vdd_s = ", ".join(str(p) for p in pw.vdd_pins)
+            vss_s = ", ".join(str(p) for p in pw.vss_pins)
+            pgm_s = (f", and Pin {pw.pgm_pin} (PGM) pulled to GND via 4.7 kΩ"
+                     if pw.pgm_pin else "")
+            items.append(PreflightItem(
+                "icsp_wiring",
+                f"{dev.display_name} ({pw.package}) is wired via ICSP / breadboard "
+                f"(NOT plugged into the 18-pin ZIF socket!): MCLR/VPP=Pin {pw.vpp_pin}, "
+                f"VDD=Pin {vdd_s} (+100nF), VSS=Pin {vss_s}, PGC=Pin {pw.pgc_pin} "
+                f"({bw.clk_pin}), PGD=Pin {pw.pgd_pin} ({bw.data_pin}){pgm_s}."
+            ))
 
     if dev.reserved_words > 0:
         items.append(PreflightItem(
@@ -114,7 +133,7 @@ def build_dynamic_preflight(dev: McuDevice, board_key: str = "uno") -> List[Pref
     items.append(PreflightItem(
         "5v_hv_safe",
         f"Confirmed {dev.display_name} is a 5 V tolerant PIC (never 3.3 V-only "
-        "silicon) and USB cable will remain connected until SAFE STATE.",
+        "silicon). Keep USB connected until the host operation finishes; this app does not measure socket voltage, so verify external VPP is off before handling the target.",
     ))
     return items
 
@@ -130,12 +149,20 @@ def gate_programmer_verified(verified: bool) -> None:
 def gate_device_match(selected: McuDevice, info: DeviceInfo) -> None:
     """Hard gate: silicon must match the selected MCU before write/erase.
 
+    The raw ID is unavailable when using the legacy host CLI. In that case the
+    adapter must rely on the host's own selected-device check; this helper will
+    not fabricate an ID from the MCU database.
+
     Two modes:
       * ID-bearing chips (e.g. PIC16F84A, ID 0x0560): strict match or block.
       * No-ID chips (e.g. PIC16F84): silicon can only prove presence
         (ID = 0x0000) — we allow it when DeviceID == 0x0000 and force the
         memory map with SETDEVICE. ID 0x3FFF (all ones) is always rejected.
     """
+    if info.device_id is None:
+        raise SafetyViolation(
+            "Raw silicon ID is unavailable from the host adapter; use the upstream host's own target-match check."
+        )
     if info.device_id == 0x3FFF:
         raise SafetyViolation(
             "Device ID reads 0x3FFF (all ones): empty socket, missing 13 V VPP, "
@@ -235,7 +262,9 @@ def gate_not_blank_only(img: HexImage) -> None:
 
 
 def build_summary(selected: McuDevice, img: HexImage,
-                  info: Optional[DeviceInfo]) -> str:
+                  info: Optional[DeviceInfo] = None,
+                  do_verify: bool = True,
+                  preserve_calibration: bool = True) -> str:
     stats = analyze_hex_for_device(img, selected)
     lines = [
         f"Target MCU:      {selected.display_name} "
@@ -248,15 +277,24 @@ def build_summary(selected: McuDevice, img: HexImage,
     if stats["config_word"] is not None:
         lines.append(f"HEX ConfigWord:  0x{stats['config_word']:04X}")
     if selected.reserved_words > 0:
-        lines.append(
-            f"Calibration:     Preserved at 0x{selected.reserved_start:04X}-"
-            f"0x{selected.program_end:04X}"
-        )
+        if preserve_calibration:
+            lines.append(
+                f"Calibration:     Preservation requested at 0x{selected.reserved_start:04X}-"
+                f"0x{selected.program_end:04X} (host behavior not hardware-validated)"
+            )
+        else:
+            lines.append("Calibration:     Preservation disabled; calibration may be overwritten.")
     if info is not None:
-        lines.append(f"Silicon ID:      0x{info.device_id:04X}"
-                     + (f" ({info.device_name})" if info.device_name else ""))
-    lines.append("Sequence:        VERIFY ID -> ERASE -> WRITE (Flash -> EEPROM -> Config) "
-                 "-> READ-BACK VERIFY -> PWROFF (0 V safe)")
+        if info.device_id is not None:
+            lines.append(f"Silicon ID:      0x{info.device_id:04X}"
+                         + (f" ({info.device_name})" if info.device_name else ""))
+        elif info.device_name:
+            lines.append(f"Host-reported:   {info.device_name} (raw ID unavailable)")
+    sequence = "Host sequence:   selected device map -> erase -> write (Flash -> EEPROM -> Config)"
+    sequence += " -> read-back compare" if do_verify else " -> read-back verify disabled"
+    lines.append(sequence + " -> normal host shutdown")
+    lines.append("Hardware check:  raw target ID and socket voltage are not exposed to this app.")
+    lines.append("Before handling: independently verify the external VPP supply is off.")
     return "\n".join(lines)
 
 
@@ -265,10 +303,10 @@ def build_summary(selected: McuDevice, img: HexImage,
 def confirm_erase_text(dev: McuDevice) -> Tuple[str, str]:
     title = f"Erase {dev.display_name}"
     cal_note = (
-        f"Factory calibration at 0x{dev.reserved_start:04X} and protected "
-        "configuration bits will be automatically saved and restored."
+        f"Calibration preservation is requested for the reserved region beginning at "
+        f"0x{dev.reserved_start:04X}; verify this behavior for the exact device and firmware."
         if dev.reserved_words > 0 or dev.config_save_mask != 0
-        else "Device ID words are read-only in silicon and remain intact."
+        else "Check the selected device datasheet for erase effects on IDs and configuration."
     )
     body = (
         f"Erase all user memory on {dev.display_name}?\n\n"
@@ -276,22 +314,33 @@ def confirm_erase_text(dev: McuDevice) -> Tuple[str, str]:
         "  • Data EEPROM will be cleared to 0xFF\n"
         "  • User ID & Configuration fuses will be reset\n\n"
         f"{cal_note}\n"
-        "Target identity will be verified before erasing, and the socket will "
-        "power off (0 V) immediately afterwards."
+        "The host uses the selected device model; raw silicon ID is not exposed to this app. "
+        "On normal shutdown the host requests power-off, but the app cannot measure socket voltage. "
+        "Verify the external VPP supply is off before touching the target."
     )
     return title, body
 
 
-def confirm_program_text(dev: McuDevice, hex_name: str) -> Tuple[str, str]:
+def confirm_program_text(dev: McuDevice, hex_name: str, do_verify: bool = True,
+                         preserve_calibration: bool = True) -> Tuple[str, str]:
     title = f"Program & Verify {dev.display_name}"
+    verification = (
+        "Read-back comparison is enabled."
+        if do_verify else "WARNING: read-back comparison is disabled."
+    )
+    calibration = (
+        "Calibration preservation is requested; verify behavior for this exact PIC and firmware."
+        if preserve_calibration else "WARNING: calibration preservation is disabled; calibration may be overwritten."
+    )
     body = (
-        f"Write '{hex_name}' to {dev.display_name}?\n\n"
-        "  1. Probe & verify silicon Device ID matches selection\n"
-        "  2. Bulk-erase chip (preserving factory calibration words)\n"
-        "  3. Write Program Flash -> Data EEPROM -> Config Fuses\n"
-        "  4. Read back & verify every written word\n"
-        "  5. Power off programming socket (MCLR=0 V, VDD=0 V)\n\n"
-        "Keep USB and 13 V VPP connected until SAFE STATE is reported."
+        f"Write '{hex_name}' to selected target {dev.display_name}?\n\n"
+        "  1. Use the selected device map (raw silicon ID is not exposed to this app)\n"
+        "  2. Erase and write Flash, EEPROM, and configuration data\n"
+        f"  3. {verification}\n"
+        f"  4. {calibration}\n"
+        "  5. Close the host normally (it requests power-off on shutdown)\n\n"
+        "The app cannot measure socket voltage. Verify the external VPP supply is off "
+        "before touching the target. Keep USB connected until the host operation finishes."
     )
     return title, body
 

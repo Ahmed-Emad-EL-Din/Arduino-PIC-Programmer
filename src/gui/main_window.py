@@ -1,39 +1,22 @@
-"""Main Workbench Window — Professional Two-Column Hardware Engineering UX.
-
-Left Workbench Pane:
-  1. Arduino Programmer Setup & Serial Link (Board selector, Port selector,
-     Flash ProgramPic Firmware, Connect / Disconnect)
-  2. Target PIC MCU & Silicon Operations (MCU selector across all 25 PICs,
-     Auto-Detect Silicon, Blank Check, Read Backup, Bulk Erase)
-  3. Firmware HEX Image & Verified Programming (Drag-and-drop / Open .hex,
-     live usage summary, Preserve calibration checkbox, Program & Verify,
-     Verify Only)
-
-Right Live Inspector Pane (`CircuitPanel`):
-  - Dynamic IEEE/IEC vector Circuit Schematic (`schemdraw` SVG) tailored to
-    the exact `(Arduino Board, Target PIC MCU)` pair
-  - Scale-proportioned PDIP IC Pinout, ZIF-18 seating & JP3 jumper guide, and
-    point-to-point wiring table
-  - HEX Memory Map & 14-bit flat word dump
-  - Official `Ho-Ro/ArdPicProg` v1.8.horo reference schematic & hardware build
-
-Bottom Dock:
-  - Filterable, timestamped Activity Log + operation progress bar & Cancel.
-"""
+"""Desktop interface for configuring, inspecting, and operating the PIC programmer."""
 
 from __future__ import annotations
 
+import re
 import sys
+import time
 from pathlib import Path
-from typing import Optional, Set, Tuple
+from typing import Dict, Optional, Tuple
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import QTimer, Qt, QUrl
 from PySide6.QtGui import (
     QAction,
     QDesktopServices,
     QDragEnterEvent,
     QDropEvent,
+    QFontMetrics,
     QKeySequence,
+    QPixmap,
 )
 from PySide6.QtWidgets import (
     QApplication,
@@ -52,13 +35,15 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSplitter,
-    QToolBar,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from app import APP_NAME, GITHUB_URL, VERSION
+from app.diagnostics import report_exception, show_diagnostic_error
 from app.settings import AppSettings
 from core.avrdude import BOARD_BY_KEY, BOARDS
 from core.ihex import HexImage, IHexError, load_hex_file
@@ -66,9 +51,11 @@ from core.mcu_db import DEFAULT_DEVICE, McuDevice, all_devices, find_by_id, look
 from core.pinout_db import MODE_ZIF_8, MODE_ZIF_18, get_board_wiring, get_pic_wiring
 from core.programmer import ProgrammerSession
 from core.safety import analyze_hex_for_device, build_summary
+from core.serial_config import PROGRAMMER_BAUD
 from core.serial_link import list_serial_ports
 from .dialogs.about import AboutDialog
 from .dialogs.flash_arduino import FlashArduinoDialog
+from .dialogs.firmware_editor import FirmwareEditorDialog
 from .dialogs.preflight import confirm_erase, confirm_program, show_preflight
 from .dialogs.settings_dialog import SettingsDialog
 from .icons import icon
@@ -81,25 +68,58 @@ ARDPICPROG_URL = "https://github.com/Ho-Ro/ArdPicProg"
 QPICKIT_URL = "https://github.com/Ho-Ro/QPICkit"
 
 
+class StatusChip(QLabel):
+    """Compact, accessible status label that keeps its full text in a tooltip."""
+
+    def __init__(self, max_width: int, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._full_text = ""
+        self.setMinimumWidth(88)
+        self.setMaximumWidth(max_width)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+
+    def set_full_text(self, text: str) -> None:
+        self._full_text = text
+        self.setToolTip(text)
+        self.setAccessibleDescription(text)
+        self._refresh_elision()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._refresh_elision()
+
+    def _refresh_elision(self) -> None:
+        available = max(48, self.contentsRect().width() - 16)
+        self.setText(
+            QFontMetrics(self.font()).elidedText(
+                self._full_text, Qt.TextElideMode.ElideRight, available
+            )
+        )
+
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.settings = AppSettings()
         self.session = ProgrammerSession(use_binary=True)
         self.lane = SingleLane()
+        self._closing_after_operation = False
         self.hex_img: Optional[HexImage] = None
         self.hex_path: str = ""
         self.target: McuDevice = lookup(self.settings.mcu) or DEFAULT_DEVICE
+        self._reported_target_name: Optional[str] = None
         self.board_key: str = (
             self.settings.board_key if self.settings.board_key in BOARD_BY_KEY else "uno"
         )
-        # Track acknowledged preflight per `(board_key, mcu_name)` pair so
-        # changing MCU or Arduino board re-verifies the new wiring!
-        self._preflight_verified_pairs: Set[Tuple[str, str]] = set()
+        # A physical checklist can be reused briefly only for the same board,
+        # PIC, and serial port. It expires after ten minutes and is cleared on
+        # disconnect or profile changes.
+        self._preflight_verified_at: Dict[Tuple[str, str, str], float] = {}
+        self._disconnect_notice = ""
 
         self.setWindowTitle(f"{APP_NAME}  ·  v{VERSION}")
-        self.setMinimumSize(1160, 740)
-        self.resize(1340, 840)
+        self.setMinimumSize(1000, 620)
+        self.resize(1280, 700)
         self.setAcceptDrops(True)
 
         self._build_ui()
@@ -111,16 +131,22 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(geo)
         st = self.settings.window_state
         if st is not None:
+            saved_log_visibility = self.settings.log_visible
             self.restoreState(st)
+            self._toggle_log(saved_log_visibility)
 
         self._refresh_ports()
         self._sync_inspector()
         self._refresh_hex_summary()
         self._refresh_actions()
+        self._port_watch_timer = QTimer(self)
+        self._port_watch_timer.setInterval(2000)
+        self._port_watch_timer.timeout.connect(self._check_connection_status)
+        self._port_watch_timer.start()
 
         self.log(
-            f"{APP_NAME} v{VERSION} ready — select your Arduino board & PIC MCU to inspect "
-            "the exact circuit schematic, connect the programmer, and upload a .hex image.",
+            f"{APP_NAME} v{VERSION} ready — select your Arduino board and PIC to view the wiring reference, "
+            "connect the programmer, then open a .hex file.",
             "OK",
         )
 
@@ -139,28 +165,48 @@ class MainWindow(QMainWindow):
         header.setObjectName("headerBar")
         hl = QHBoxLayout(header)
         hl.setContentsMargins(16, 10, 16, 10)
-        hl.setSpacing(10)
+        hl.setSpacing(8)
+
+        self.brand_icon = QLabel()
+        self.brand_icon.setObjectName("brandIcon")
+        self.brand_icon.setAccessibleName("Arduino-PIC Programmer logo")
+        self.brand_icon.setFixedSize(44, 44)
+        self.brand_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        app_root = (
+            Path(sys._MEIPASS)
+            if getattr(sys, "frozen", False)
+            else Path(__file__).resolve().parents[2]
+        )
+        logo = QPixmap(str(app_root / "assets" / "app-icon.ico"))
+        if not logo.isNull():
+            self.brand_icon.setPixmap(logo.scaled(
+                42, 42, Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            ))
+        hl.addWidget(self.brand_icon, 0, Qt.AlignmentFlag.AlignVCenter)
 
         title_col = QVBoxLayout()
         title_col.setSpacing(1)
         t_lbl = QLabel(APP_NAME)
         t_lbl.setObjectName("appTitle")
-        sub_lbl = QLabel(
-            "Arduino-based PIC16F / PIC12F HV ICSP & ZIF-18 workbench (ProgramPic v1.8.horo)"
-        )
+        sub_lbl = QLabel("PIC programmer")
         sub_lbl.setObjectName("muted")
         title_col.addWidget(t_lbl)
         title_col.addWidget(sub_lbl)
         hl.addLayout(title_col)
         hl.addStretch()
 
-        self.chip_board = QLabel()
-        self.chip_prog = QLabel()
-        self.chip_target = QLabel()
-        self.chip_file = QLabel()
-        for ch in (self.chip_board, self.chip_prog, self.chip_target, self.chip_file):
-            ch.setObjectName("chip")
-            hl.addWidget(ch)
+        # Keep only the two live statuses that are not already obvious from the
+        # board/PIC selectors and the HEX card below.
+        self.chip_prog = StatusChip(190)
+        self.chip_target = StatusChip(210)
+        for chip, name in (
+            (self.chip_prog, "Programmer connection status"),
+            (self.chip_target, "Selected PIC target"),
+        ):
+            chip.setObjectName("chip")
+            chip.setAccessibleName(name)
+            hl.addWidget(chip, 1)
         outer.addWidget(header)
 
         # ---- 2. Main Two-Column Splitter ----
@@ -173,7 +219,7 @@ class MainWindow(QMainWindow):
         left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         left_scroll.setFrameShape(QFrame.Shape.NoFrame)
         left_scroll.setMinimumWidth(490)
-        left_scroll.setMaximumWidth(610)
+        left_scroll.setMaximumWidth(600)
 
         left_body = QWidget()
         left_body.setObjectName("leftWorkbench")
@@ -188,7 +234,7 @@ class MainWindow(QMainWindow):
         lcol.addStretch(1)
         left_scroll.setWidget(left_body)
 
-        # Right Pane: Live Circuit Schematic, IC Pinout & HEX Memory Inspector
+        # Right pane: selected hardware context plus adjacent reference and wiring tabs
         right_wrap = QWidget()
         right_wrap.setObjectName("inspectorPane")
         right_wrap.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -202,7 +248,7 @@ class MainWindow(QMainWindow):
         self.main_split.addWidget(right_wrap)
         self.main_split.setStretchFactor(0, 0)
         self.main_split.setStretchFactor(1, 1)
-        self.main_split.setSizes([510, 830])
+        self.main_split.setSizes([480, 800])
         outer.addWidget(self.main_split, 1)
 
         # ---- 3. Bottom Progress & Action Status Bar ----
@@ -212,20 +258,25 @@ class MainWindow(QMainWindow):
         psl.setContentsMargins(16, 6, 16, 6)
         psl.setSpacing(10)
 
-        self.status_lbl = QLabel("Idle — socket unpowered (0 V safe state)")
+        self.status_lbl = QLabel("Idle")
         self.status_lbl.setObjectName("muted")
+        self.status_lbl.setAccessibleName("Operation status")
         psl.addWidget(self.status_lbl, 2)
 
         self.progress = QProgressBar()
+        self.progress.setAccessibleName("Operation progress")
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
         self.progress.setMaximumWidth(280)
         psl.addWidget(self.progress, 1)
+        self.progress.setVisible(False)
 
         self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.setAccessibleName("Cancel current hardware operation")
         self.btn_cancel.setObjectName("dangerOutline")
         self.btn_cancel.setFixedHeight(26)
         self.btn_cancel.setEnabled(False)
+        self.btn_cancel.setVisible(False)
         self.btn_cancel.clicked.connect(self._cancel_current)
         psl.addWidget(self.btn_cancel)
         outer.addWidget(prog_strip)
@@ -273,11 +324,7 @@ class MainWindow(QMainWindow):
         lay.setSpacing(8)
 
         lay.addLayout(
-            self._make_card_header(
-                "1",
-                "Arduino Programmer Link",
-                "Select your host Arduino board, flash ProgramPic once, then connect.",
-            )
+            self._make_card_header("1", "Programmer", "Board and port")
         )
 
         form = QFormLayout()
@@ -287,6 +334,11 @@ class MainWindow(QMainWindow):
         self.cmb_board = QComboBox()
         self.cmb_board.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.cmb_board.setMinimumContentsLength(18)
+        self.cmb_board.setAccessibleName("Arduino board type")
+        self.cmb_board.setToolTip(
+            "Selects the wiring reference and Nano bootloader profile; it does not detect the connected board. "
+            "Bootloader upload speed is separate from the 9600-baud ProgramPic link."
+        )
         for b in BOARDS:
             self.cmb_board.addItem(b.label, b.key)
         b_idx = self.cmb_board.findData(self.board_key)
@@ -300,7 +352,10 @@ class MainWindow(QMainWindow):
         self.cmb_port = QComboBox()
         self.cmb_port.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.cmb_port.setMinimumContentsLength(14)
+        self.cmb_port.setAccessibleName("Arduino serial port")
+        self.cmb_port.setToolTip("Choose the serial port used by the Arduino programmer.")
         self.btn_rescan = QPushButton("Rescan")
+        self.btn_rescan.setAccessibleName("Rescan serial ports")
         self.btn_rescan.clicked.connect(self._refresh_ports)
         port_row.addWidget(self.cmb_port, 1)
         port_row.addWidget(self.btn_rescan)
@@ -314,18 +369,28 @@ class MainWindow(QMainWindow):
         self.lbl_board_note.setWordWrap(True)
         lay.addWidget(self.lbl_board_note)
 
+        self.lbl_connection_guidance = QLabel()
+        self.lbl_connection_guidance.setObjectName("guidance")
+        self.lbl_connection_guidance.setWordWrap(True)
+        self.lbl_connection_guidance.setAccessibleName("Programmer connection guidance")
+        lay.addWidget(self.lbl_connection_guidance)
+
         btns = QHBoxLayout()
         btns.setSpacing(6)
         self.btn_connect = QPushButton("Connect")
+        self.btn_connect.setAccessibleName("Connect programmer")
         self.btn_connect.setObjectName("primary")
         self.btn_connect.clicked.connect(self._connect)
 
         self.btn_disconnect = QPushButton("Disconnect")
+        self.btn_disconnect.setAccessibleName("Disconnect programmer")
+        self.btn_disconnect.setVisible(False)
         self.btn_disconnect.clicked.connect(self._disconnect)
 
-        self.btn_flash_ard = QPushButton("Flash Arduino…")
+        self.btn_flash_ard = QPushButton("Install Firmware…")
+        self.btn_flash_ard.setAccessibleName("Install Arduino firmware")
         self.btn_flash_ard.setToolTip(
-            "Upload ProgramPic v1.8.horo firmware onto the selected Arduino via avrdude"
+            "Install or update ProgramPic v1.8.horo on the selected Arduino. This replaces its current sketch."
         )
         self.btn_flash_ard.clicked.connect(self._flash_arduino)
 
@@ -343,11 +408,7 @@ class MainWindow(QMainWindow):
         lay.setSpacing(8)
 
         lay.addLayout(
-            self._make_card_header(
-                "2",
-                "Target PIC Microcontroller",
-                "Pick the exact PIC MCU — updates the schematic, PDIP pinout & safety gates.",
-            )
+            self._make_card_header("2", "PIC target", "Choose the package marking")
         )
 
         mcu_row = QHBoxLayout()
@@ -355,21 +416,18 @@ class MainWindow(QMainWindow):
         self.cmb_mcu = QComboBox()
         self.cmb_mcu.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.cmb_mcu.setMinimumContentsLength(18)
+        self.cmb_mcu.setAccessibleName("Selected PIC target")
+        self.cmb_mcu.setToolTip("Selection changes the memory map and wiring reference; it is not hardware identification.")
         for dev in all_devices():
-            pw = get_pic_wiring(dev.name)
-            id_tag = "Auto-ID" if dev.has_device_id else "Manual"
-            mode_tag = f"JP3={pw.jp3_position}" if pw.uses_zif else "ICSP"
-            self.cmb_mcu.addItem(
-                f"{dev.display_name}  ·  {pw.package} ({mode_tag}, {id_tag})",
-                dev.name,
-            )
+            self.cmb_mcu.addItem(dev.display_name, dev.name)
         m_idx = self.cmb_mcu.findData(self.target.name)
         self.cmb_mcu.setCurrentIndex(max(0, m_idx))
         self.cmb_mcu.currentIndexChanged.connect(self._on_mcu_changed)
         mcu_row.addWidget(self.cmb_mcu, 1)
 
-        self.btn_detect = QPushButton("Auto-Detect")
-        self.btn_detect.setToolTip("Probe silicon Device ID (0x2006) via programmer")
+        self.btn_detect = QPushButton("Detect PIC")
+        self.btn_detect.setAccessibleName("Detect PIC target")
+        self.btn_detect.setToolTip("Ask the programmer to identify the PIC.")
         self.btn_detect.clicked.connect(self._detect)
         mcu_row.addWidget(self.btn_detect)
         lay.addLayout(mcu_row)
@@ -383,13 +441,34 @@ class MainWindow(QMainWindow):
         self.lbl_mcu_specs = QLabel()
         self.lbl_mcu_specs.setObjectName("monoSmall")
         self.lbl_mcu_specs.setWordWrap(True)
-        self.lbl_silicon_probe = QLabel("Detected silicon: not probed yet")
+        self.lbl_silicon_probe = QLabel("Not checked")
         self.lbl_silicon_probe.setObjectName("muted")
         sbl.addWidget(self.lbl_mcu_specs)
         sbl.addWidget(self.lbl_silicon_probe)
         lay.addWidget(spec_box)
 
-        # Non-HEX Silicon Utilities: Blank Check, Read Backup, Bulk Erase
+        self.lbl_target_guidance = QLabel()
+        self.lbl_target_guidance.setObjectName("guidance")
+        self.lbl_target_guidance.setWordWrap(True)
+        self.lbl_target_guidance.setAccessibleName("Target selection and identity limitations")
+        lay.addWidget(self.lbl_target_guidance)
+
+        self.btn_more_target = QToolButton()
+        self.btn_more_target.setObjectName("disclosureButton")
+        self.btn_more_target.setText("Tools")
+        self.btn_more_target.setAccessibleName("Show more target actions")
+        self.btn_more_target.setToolTip("Open optional blank-check, read-backup, and erase tools.")
+        self.btn_more_target.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.btn_more_target.setArrowType(Qt.ArrowType.RightArrow)
+        self.btn_more_target.setCheckable(True)
+        self.btn_more_target.toggled.connect(self._toggle_target_tools)
+        lay.addWidget(self.btn_more_target, 0, Qt.AlignmentFlag.AlignLeft)
+
+        self.target_tools_panel = QFrame()
+        self.target_tools_panel.setObjectName("targetToolsPanel")
+        tools_layout = QVBoxLayout(self.target_tools_panel)
+        tools_layout.setContentsMargins(8, 8, 8, 8)
+        tools_layout.setSpacing(6)
         grid = QGridLayout()
         grid.setSpacing(6)
         self.btn_blank = QPushButton("Blank Check")
@@ -405,7 +484,9 @@ class MainWindow(QMainWindow):
         grid.addWidget(self.btn_blank, 0, 0)
         grid.addWidget(self.btn_read, 0, 1)
         grid.addWidget(self.btn_erase, 0, 2)
-        lay.addLayout(grid)
+        tools_layout.addLayout(grid)
+        self.target_tools_panel.setVisible(False)
+        lay.addWidget(self.target_tools_panel)
         return card
 
     def _build_firmware_card(self) -> QFrame:
@@ -416,29 +497,22 @@ class MainWindow(QMainWindow):
         lay.setSpacing(8)
 
         lay.addLayout(
-            self._make_card_header(
-                "3",
-                "Firmware Image (.hex) & Write",
-                "Open or drop an Intel HEX file. Memory bounds & silicon ID are checked before write.",
-            )
+            self._make_card_header("3", "Program from HEX", "Open a HEX file, then program the PIC")
         )
 
         file_row = QHBoxLayout()
         file_row.setSpacing(6)
-        self.btn_open_hex = QPushButton("Open HEX File…")
+        self.btn_open_hex = QPushButton("Open HEX…")
+        self.btn_open_hex.setAccessibleName("Open HEX file")
+        self.btn_open_hex.setToolTip("Load a HEX file.")
         self.btn_open_hex.clicked.connect(self.open_hex)
 
         self.btn_reload_hex = QPushButton("Reload")
         self.btn_reload_hex.setToolTip("Reload the current .hex file from disk")
         self.btn_reload_hex.clicked.connect(self._reload_hex)
 
-        self.btn_inspect_hex = QPushButton("Inspect Map")
-        self.btn_inspect_hex.setToolTip("Open the HEX Memory Map tab on the right")
-        self.btn_inspect_hex.clicked.connect(lambda: self.circuit_panel.tabs.setCurrentIndex(2))
-
         file_row.addWidget(self.btn_open_hex, 2)
         file_row.addWidget(self.btn_reload_hex, 1)
-        file_row.addWidget(self.btn_inspect_hex, 1)
         lay.addLayout(file_row)
 
         hex_box = QFrame()
@@ -455,20 +529,36 @@ class MainWindow(QMainWindow):
         hbl.addWidget(self.lbl_hex_stats)
         lay.addWidget(hex_box)
 
-        self.chk_preserve_cal = QCheckBox(
-            "Preserve factory OSCCAL & bandgap calibration bits (recommended)"
-        )
+        self.lbl_hex_guidance = QLabel()
+        self.lbl_hex_guidance.setObjectName("guidance")
+        self.lbl_hex_guidance.setWordWrap(True)
+        self.lbl_hex_guidance.setAccessibleName("HEX image compatibility status")
+        lay.addWidget(self.lbl_hex_guidance)
+
+        self.chk_preserve_cal = QCheckBox("Preserve calibration data")
         self.chk_preserve_cal.setChecked(True)
+        self.chk_preserve_cal.setToolTip(
+            "Requests preservation of reserved calibration data where supported. "
+            "Behavior must be validated for the exact PIC and programmer firmware."
+        )
         lay.addWidget(self.chk_preserve_cal)
+
+        self.lbl_verify_guidance = QLabel()
+        self.lbl_verify_guidance.setObjectName("guidance")
+        self.lbl_verify_guidance.setWordWrap(True)
+        self.lbl_verify_guidance.setAccessibleName("Read-back comparison setting")
+        lay.addWidget(self.lbl_verify_guidance)
 
         act_row = QHBoxLayout()
         act_row.setSpacing(6)
-        self.btn_program = QPushButton("Program && Verify PIC")
+        self.btn_program = QPushButton("Program PIC…")
+        self.btn_program.setAccessibleName("Program PIC from selected HEX file")
         self.btn_program.setObjectName("primary")
         self.btn_program.setMinimumHeight(36)
         self.btn_program.clicked.connect(self._program)
 
         self.btn_verify = QPushButton("Verify Only")
+        self.btn_verify.setAccessibleName("Verify PIC against selected HEX file")
         self.btn_verify.setMinimumHeight(36)
         self.btn_verify.clicked.connect(self._verify_only)
 
@@ -478,7 +568,7 @@ class MainWindow(QMainWindow):
         return card
 
     # ------------------------------------------------------------------
-    # Menus & Primary Toolbar
+    # Menus
     # ------------------------------------------------------------------
     def _build_menus_and_toolbar(self) -> None:
         mb = self.menuBar()
@@ -499,9 +589,9 @@ class MainWindow(QMainWindow):
         self.act_save.triggered.connect(self._read_chip)
         m_file.addAction(self.act_save)
 
-        self.act_export_schem = QAction("Export Circuit Schematic…", self)
-        self.act_export_schem.triggered.connect(self.circuit_panel._export_schematic)
-        m_file.addAction(self.act_export_schem)
+        self.act_export_reference = QAction("Export Circuit Reference…", self)
+        self.act_export_reference.triggered.connect(self.circuit_panel._export_reference)
+        m_file.addAction(self.act_export_reference)
 
         self.act_export_log = QAction("Export Activity Log…", self)
         self.act_export_log.triggered.connect(self.log_pane._save)
@@ -520,9 +610,13 @@ class MainWindow(QMainWindow):
         self.act_ports.triggered.connect(self._refresh_ports)
         m_prog.addAction(self.act_ports)
 
-        self.act_flash = QAction("Flash Arduino Firmware…", self)
+        self.act_flash = QAction("Install/Update ProgramPic Firmware…", self)
         self.act_flash.triggered.connect(self._flash_arduino)
         m_prog.addAction(self.act_flash)
+
+        self.act_firmware_source = QAction("Edit ProgramPic Source…", self)
+        self.act_firmware_source.triggered.connect(lambda: FirmwareEditorDialog(self).exec())
+        m_prog.addAction(self.act_firmware_source)
 
         m_prog.addSeparator()
         self.act_connect = QAction("&Connect Programmer", self)
@@ -535,7 +629,7 @@ class MainWindow(QMainWindow):
         m_prog.addAction(self.act_disconnect)
 
         m_prog.addSeparator()
-        self.act_detect = QAction("Auto-Detect PIC", self)
+        self.act_detect = QAction("Query Programmer for Target Model", self)
         self.act_detect.setShortcut(QKeySequence("F6"))
         self.act_detect.triggered.connect(self._detect)
         m_prog.addAction(self.act_detect)
@@ -544,7 +638,7 @@ class MainWindow(QMainWindow):
         self.act_blank.triggered.connect(self._blank_check)
         m_prog.addAction(self.act_blank)
 
-        self.act_program = QAction("Program && Verify PIC…", self)
+        self.act_program = QAction("Program PIC…", self)
         self.act_program.setShortcut(QKeySequence("Ctrl+R"))
         self.act_program.triggered.connect(self._program)
         m_prog.addAction(self.act_program)
@@ -570,27 +664,6 @@ class MainWindow(QMainWindow):
         self.act_log.setShortcut(QKeySequence("Ctrl+L"))
         self.act_log.toggled.connect(self._toggle_log)
         m_view.addAction(self.act_log)
-
-        m_view.addSeparator()
-        act_t_schem = QAction("Show Circuit Schematic Tab", self)
-        act_t_schem.setShortcut(QKeySequence("Alt+1"))
-        act_t_schem.triggered.connect(lambda: self.circuit_panel.tabs.setCurrentIndex(0))
-        m_view.addAction(act_t_schem)
-
-        act_t_pin = QAction("Show IC Pinout && Wiring Tab", self)
-        act_t_pin.setShortcut(QKeySequence("Alt+2"))
-        act_t_pin.triggered.connect(lambda: self.circuit_panel.tabs.setCurrentIndex(1))
-        m_view.addAction(act_t_pin)
-
-        act_t_hex = QAction("Show HEX Memory Map Tab", self)
-        act_t_hex.setShortcut(QKeySequence("Alt+3"))
-        act_t_hex.triggered.connect(lambda: self.circuit_panel.tabs.setCurrentIndex(2))
-        m_view.addAction(act_t_hex)
-
-        act_t_ref = QAction("Show ArdPicProg Reference Tab", self)
-        act_t_ref.setShortcut(QKeySequence("Alt+4"))
-        act_t_ref.triggered.connect(lambda: self.circuit_panel.tabs.setCurrentIndex(3))
-        m_view.addAction(act_t_ref)
 
         m_view.addSeparator()
         act_zin = QAction("Increase UI Font Size", self)
@@ -640,26 +713,6 @@ class MainWindow(QMainWindow):
         self.act_about.triggered.connect(lambda: AboutDialog(self).exec())
         m_help.addAction(self.act_about)
 
-        # ---- Top Action Toolbar ----
-        tb = QToolBar("Workbench Toolbar", self)
-        tb.setObjectName("mainToolbar")
-        tb.setMovable(False)
-        tb.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        tb.addAction(self.act_open)
-        tb.addSeparator()
-        tb.addAction(self.act_flash)
-        tb.addAction(self.act_connect)
-        tb.addAction(self.act_detect)
-        tb.addSeparator()
-        tb.addAction(self.act_program)
-        tb.addAction(self.act_verify)
-        tb.addAction(self.act_save)
-        tb.addSeparator()
-        tb.addAction(self.act_theme)
-        tb.addAction(self.act_settings)
-        tb.addAction(self.act_guide)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, tb)
-
     # ------------------------------------------------------------------
     # Theme & Icon Synchronization
     # ------------------------------------------------------------------
@@ -672,7 +725,7 @@ class MainWindow(QMainWindow):
         ic_col = t.subtext
         self.act_open.setIcon(icon("open", ic_col))
         self.act_save.setIcon(icon("download", ic_col))
-        self.act_export_schem.setIcon(icon("circuit", ic_col))
+        self.act_export_reference.setIcon(icon("circuit", ic_col))
         self.act_export_log.setIcon(icon("log", ic_col))
         self.act_ports.setIcon(icon("refresh", ic_col))
         self.act_flash.setIcon(icon("upload", ic_col))
@@ -703,7 +756,7 @@ class MainWindow(QMainWindow):
 
     def _zoom_font(self, step: int) -> None:
         if step == 0:
-            fs = 10
+            fs = 11
         else:
             fs = max(9, min(14, self.settings.font_size + step))
         self.settings.font_size = fs
@@ -717,6 +770,7 @@ class MainWindow(QMainWindow):
         self.act_log.blockSignals(True)
         self.act_log.setChecked(visible)
         self.act_log.blockSignals(False)
+        self.settings.log_visible = visible
 
     # ------------------------------------------------------------------
     # State Synchronization & Selectors
@@ -727,13 +781,46 @@ class MainWindow(QMainWindow):
             "warn": "chipWarn",
             "bad": "chipBad",
         }.get(variant, "chip")
+        if isinstance(lbl, StatusChip):
+            lbl.set_full_text(text)
+        else:
+            lbl.setText(text)
+        if lbl.objectName() != obj:
+            lbl.setObjectName(obj)
+            lbl.style().unpolish(lbl)
+            lbl.style().polish(lbl)
+            if isinstance(lbl, StatusChip):
+                lbl._refresh_elision()
+
+    @staticmethod
+    def _set_primary_button(button: QPushButton, primary: bool) -> None:
+        object_name = "primary" if primary else ""
+        if button.objectName() != object_name:
+            button.setObjectName(object_name)
+            button.style().unpolish(button)
+            button.style().polish(button)
+
+    @staticmethod
+    def _set_guidance(lbl: QLabel, text: str, variant: str = "neutral") -> None:
+        """Update compact, persistent state guidance without relying on color alone."""
+        obj = {"warn": "guidanceWarn", "ok": "guidanceOk"}.get(variant, "guidance")
         lbl.setText(text)
         if lbl.objectName() != obj:
             lbl.setObjectName(obj)
             lbl.style().unpolish(lbl)
             lbl.style().polish(lbl)
 
+    def _toggle_target_tools(self, expanded: bool) -> None:
+        self.target_tools_panel.setVisible(expanded)
+        self.btn_more_target.setArrowType(
+            Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow
+        )
+        self.btn_more_target.setAccessibleName(
+            "Hide more target actions" if expanded else "Show more target actions"
+        )
+
     def _on_board_changed(self) -> None:
+        self._preflight_verified_at.clear()
         bkey = str(self.cmb_board.currentData() or "uno")
         self.board_key = bkey
         self.settings.board_key = bkey
@@ -741,10 +828,19 @@ class MainWindow(QMainWindow):
         self._refresh_actions()
 
     def _on_mcu_changed(self) -> None:
+        self._preflight_verified_at.clear()
         mname = str(self.cmb_mcu.currentData() or "pic16f84a")
         dev = lookup(mname) or DEFAULT_DEVICE
         self.target = dev
         self.settings.mcu = dev.name
+        if self._reported_target_name:
+            prior = lookup(self._reported_target_name)
+            prior_name = prior.display_name if prior else self._reported_target_name
+            self.lbl_silicon_probe.setText(
+                f"Last detected: {prior_name}"
+            )
+        else:
+            self.lbl_silicon_probe.setText("Not checked")
         # Preserve calibration checkbox only applies to MCUs with calibration words/bits
         has_cal = dev.reserved_words > 0 or dev.config_save_mask != 0
         self.chk_preserve_cal.setEnabled(has_cal)
@@ -756,23 +852,29 @@ class MainWindow(QMainWindow):
         bw = get_board_wiring(self.board_key)
         pw = get_pic_wiring(self.target.name)
 
-        if self.board_key == "pro_mini_8":
+        pin_summary = (
+            f"{bw.vdd_pin} VDD · {bw.mclr_pin} MCLR/VPP · "
+            f"{bw.clk_pin} clock · {bw.data_pin} data · {bw.activity_pin} LED"
+        )
+        if self.board_key == "pro_mini_5v":
             self.lbl_board_note.setText(
-                "⚠ 3.3V board selected — 5V PIC bulk erase requires 4.5–5.5 V VDD!"
+                "Use 5 V / 16 MHz only. " + pin_summary
             )
             self.lbl_board_note.setObjectName("warn")
         elif bw.needs_reset_cap:
             self.lbl_board_note.setText(
-                f"Pins: {bw.vdd_pin}=VDD, {bw.mclr_pin}=MCLR, {bw.clk_pin}=CLK, "
-                f"{bw.data_pin}=DATA · Add 2.2 µF {bw.reset_pin}-GND cap after flashing."
+                pin_summary + f" Add 2.2 µF from {bw.reset_pin} to GND after flashing."
             )
             self.lbl_board_note.setObjectName("muted")
         else:
             self.lbl_board_note.setText(
-                f"Pins: {bw.vdd_pin}=VDD, {bw.mclr_pin}=MCLR, {bw.clk_pin}=CLK, "
-                f"{bw.data_pin}=DATA · Native USB CDC (no 2.2 µF cap needed)."
+                pin_summary
             )
             self.lbl_board_note.setObjectName("muted")
+        self.lbl_board_note.setToolTip(
+            "Do not connect the ~13 V VPP rail directly to Arduino A1 or any Arduino pin. "
+            "A1 drives only the external VPP switching circuit."
+        )
         self.lbl_board_note.style().unpolish(self.lbl_board_note)
         self.lbl_board_note.style().polish(self.lbl_board_note)
 
@@ -781,6 +883,23 @@ class MainWindow(QMainWindow):
             f"Flash: {self.target.program_words} w  ·  EEPROM: {self.target.data_bytes} B  ·  "
             f"{pw.package}  ·  {cal_str}"
         )
+        if not pw.pinout_verified:
+            self._set_guidance(
+                self.lbl_target_guidance,
+                f"Check {self.target.display_name} pinout in its datasheet before wiring.",
+                "warn",
+            )
+        elif not self.target.has_device_id:
+            self._set_guidance(
+                self.lbl_target_guidance,
+                f"No device ID. Check the package marking: {self.target.display_name}.",
+                "warn",
+            )
+        else:
+            self._set_guidance(
+                self.lbl_target_guidance,
+                f"Selected: {self.target.display_name}. Detect PIC checks the reported model.",
+            )
 
         self.circuit_panel.set_context(
             mcu_name=self.target.name,
@@ -797,18 +916,59 @@ class MainWindow(QMainWindow):
             self.cmb_port.addItem(f"{prefix}{p.label()}", p.device)
         if not ports:
             self.cmb_port.addItem("No serial ports detected", "")
+            if self._disconnect_notice and not self.session.connected:
+                self._disconnect_notice = (
+                    "Arduino disconnected. Reconnect its USB cable, Rescan ports, "
+                    "then Connect before using PIC actions."
+                )
         else:
             for i in range(self.cmb_port.count()):
                 if self.cmb_port.itemData(i) == prev:
                     self.cmb_port.setCurrentIndex(i)
                     break
+            if self._disconnect_notice and not self.session.connected:
+                selected = str(self.cmb_port.currentData() or "")
+                self._disconnect_notice = (
+                    f"Arduino detected on {selected} but not connected. Select Connect to continue."
+                    if selected else "Arduino detected. Select its port and Connect to continue."
+                )
+        self._refresh_actions()
+
+    def _check_connection_status(self) -> None:
+        """Notice physical USB removal and invalidate the verified session."""
+        if not self.session.connected or self.lane.busy:
+            return
+        port = self.session.state.port
+        try:
+            present = any(item.device == port for item in list_serial_ports())
+        except Exception:
+            # A transient OS enumeration error is not proof that the programmer
+            # was unplugged; leave the current state intact and try next poll.
+            return
+        if not present:
+            self.session.disconnect()
+            self._reported_target_name = None
+            self._preflight_verified_at.clear()
+            self._disconnect_notice = (
+                "Arduino disconnected. Reconnect its USB cable, Rescan ports, "
+                "then Connect before using PIC actions."
+            )
+            self.lbl_silicon_probe.setText("Programmer report: Arduino disconnected")
+            self.status_lbl.setText("Arduino disconnected — reconnect and Connect to continue")
+            self.log(
+                f"Arduino disconnected: serial port {port} disappeared. Hardware actions are disabled until a new handshake succeeds.",
+                "WARN",
+            )
+            self._refresh_ports()
 
     def _refresh_hex_summary(self) -> None:
-        self.circuit_panel.set_hex_image(self.hex_img)
         if self.hex_img is None or self.hex_img.is_empty():
-            self.lbl_hex_name.setText("No .hex file loaded (drag & drop a .hex file anywhere)")
+            self.lbl_hex_name.setText("No .hex file loaded")
             self.lbl_hex_stats.setText("Program: —  ·  EEPROM: —  ·  Config: —")
-            self._set_chip_state(self.chip_file, "HEX: none", "neutral")
+            self._set_guidance(
+                self.lbl_hex_guidance,
+                "Open a HEX file to continue.",
+            )
             return
 
         fname = Path(self.hex_path).name if self.hex_path else "memory_read.hex"
@@ -817,6 +977,7 @@ class MainWindow(QMainWindow):
         eb = int(diag["data_bytes"])
         cw = int(diag["cfg_words"])
         oot = list(diag["out_of_range"])
+        hex_warnings = list(diag["warnings"])
 
         self.lbl_hex_name.setText(f"Loaded: {fname}")
         self.lbl_hex_stats.setText(
@@ -824,25 +985,95 @@ class MainWindow(QMainWindow):
             f"EEPROM: {eb}/{self.target.data_bytes} B  ·  Config: {cw} w"
         )
         if oot:
-            self._set_chip_state(self.chip_file, f"HEX: {fname} (Range Mismatch)", "bad")
+            first = ", ".join(f"0x{int(addr):04X}" for addr in oot[:3])
+            more = f" and {len(oot) - 3} more" if len(oot) > 3 else ""
+            self._set_guidance(
+                self.lbl_hex_guidance,
+                f"HEX address outside {self.target.display_name}: {first}{more}. Check the target and file.",
+                "warn",
+            )
+        elif hex_warnings:
+            note = " ".join(hex_warnings[:2])
+            if len(hex_warnings) > 2:
+                note += f" ({len(hex_warnings) - 2} more warning(s) in this HEX file.)"
+            self._set_guidance(
+                self.lbl_hex_guidance,
+                f"Check HEX warnings: {note}",
+                "warn",
+            )
         else:
-            self._set_chip_state(self.chip_file, f"HEX: {fname}", "ok")
+            self._set_guidance(
+                self.lbl_hex_guidance,
+                f"HEX fits {self.target.display_name}.",
+                "ok",
+            )
 
     def _refresh_actions(self) -> None:
         busy = self.lane.busy
         conn = self.session.connected
+        has_port = bool(self.cmb_port.currentData())
         has_hex = self.hex_img is not None and not self.hex_img.is_empty()
-
-        bw = get_board_wiring(self.board_key)
-        self._set_chip_state(
-            self.chip_board,
-            f"Board: {bw.board_name}",
-            "warn" if self.board_key == "pro_mini_8" else "neutral",
+        hex_fits = False
+        if has_hex:
+            hex_fits = bool(analyze_hex_for_device(self.hex_img, self.target)["fits"])
+        target_mismatch = bool(
+            self._reported_target_name and self._reported_target_name != self.target.name
         )
+
+        if target_mismatch:
+            reported = lookup(self._reported_target_name)
+            reported_label = reported.display_name if reported else self._reported_target_name
+            self._set_guidance(
+                self.lbl_target_guidance,
+                f"Selected {self.target.display_name}; last detected {reported_label}. Detect again or select the detected PIC.",
+                "warn",
+            )
+
+        if self.settings.auto_verify:
+            self._set_guidance(
+                self.lbl_verify_guidance,
+                "Read-back check: on.",
+                "ok",
+            )
+        else:
+            self._set_guidance(
+                self.lbl_verify_guidance,
+                "Read-back check is off.",
+                "warn",
+            )
+
+        if busy:
+            self._set_guidance(
+                self.lbl_connection_guidance,
+                "Working…"
+            )
+        elif conn:
+            self._set_guidance(
+                self.lbl_connection_guidance,
+                f"Connected · {self.session.state.port}",
+            )
+        elif self._disconnect_notice:
+            self._set_guidance(
+                self.lbl_connection_guidance,
+                self._disconnect_notice,
+                "warn",
+            )
+        elif not has_port:
+            self._set_guidance(
+                self.lbl_connection_guidance,
+                "Arduino disconnected. No port found. Connect it and rescan.",
+                "warn",
+            )
+        else:
+            self._set_guidance(
+                self.lbl_connection_guidance,
+                "Select a port, then connect. Install ProgramPic if needed.",
+            )
+
         if conn:
             self._set_chip_state(
                 self.chip_prog,
-                f"Programmer: {self.session.state.port} (v{self.session.state.firmware})",
+                f"Programmer: {self.session.state.port}",
                 "ok",
             )
         else:
@@ -852,40 +1083,106 @@ class MainWindow(QMainWindow):
         mode_lbl = f"JP3={pw.jp3_position}" if pw.uses_zif else "ICSP"
         self._set_chip_state(
             self.chip_target,
-            f"Target: {self.target.display_name} ({mode_lbl})",
-            "ok" if conn else "neutral",
+            f"PIC: {self.target.display_name} ({mode_lbl})",
+            "neutral",
         )
 
         # Control states
-        self.cmb_board.setEnabled(not busy)
+        self.cmb_board.setEnabled(not busy and not conn)
         self.cmb_port.setEnabled(not busy and not conn)
         self.btn_rescan.setEnabled(not busy and not conn)
         self.btn_flash_ard.setEnabled(not busy and not conn)
-        self.btn_connect.setEnabled(not busy and not conn)
+        self.btn_connect.setVisible(not conn)
+        self.btn_disconnect.setVisible(conn)
+        self.btn_flash_ard.setVisible(not conn)
+        self.btn_connect.setEnabled(not busy and not conn and has_port)
         self.btn_disconnect.setEnabled(not busy and conn)
 
         self.cmb_mcu.setEnabled(not busy)
         self.btn_detect.setEnabled(not busy and conn)
-        self.btn_blank.setEnabled(not busy and conn)
-        self.btn_read.setEnabled(not busy and conn)
-        self.btn_erase.setEnabled(not busy and conn)
+        self.btn_blank.setEnabled(not busy and conn and not target_mismatch)
+        self.btn_read.setEnabled(not busy and conn and not target_mismatch)
+        self.btn_erase.setEnabled(not busy and conn and not target_mismatch)
 
         self.btn_open_hex.setEnabled(not busy)
         self.btn_reload_hex.setEnabled(not busy and bool(self.hex_path))
-        self.btn_program.setEnabled(not busy and conn and has_hex)
-        self.btn_verify.setEnabled(not busy and conn and has_hex)
+        self.btn_program.setEnabled(not busy and conn and has_hex and hex_fits and not target_mismatch)
+        self.btn_verify.setEnabled(not busy and conn and has_hex and hex_fits and not target_mismatch)
+        self.progress.setVisible(busy)
+        self.btn_cancel.setVisible(busy)
         self.btn_cancel.setEnabled(busy)
 
+        next_action = None
+        if not busy:
+            if not conn:
+                next_action = self.btn_connect if has_port else self.btn_rescan
+            elif target_mismatch:
+                next_action = self.btn_detect
+            elif not has_hex:
+                next_action = self.btn_open_hex
+            elif not hex_fits:
+                next_action = self.btn_open_hex
+            else:
+                next_action = self.btn_program
+        for button in (
+            self.btn_rescan,
+            self.btn_connect,
+            self.btn_detect,
+            self.btn_open_hex,
+            self.btn_program,
+        ):
+            self._set_primary_button(button, button is next_action)
+
+        if target_mismatch:
+            op_reason = "ProgramPic reported a different model. Resolve the target mismatch before hardware operations."
+        elif not conn:
+            op_reason = "Connect the programmer before starting a hardware operation."
+        elif not has_hex:
+            op_reason = "Load a non-empty Intel HEX file first."
+        elif not hex_fits:
+            op_reason = "The HEX contains addresses outside the selected target memory map."
+        else:
+            op_reason = ""
+        hardware_reason = (
+            "Wait for the active operation to finish." if busy else
+            "Resolve the ProgramPic report/selection mismatch first." if target_mismatch else
+            "Connect the programmer first." if not conn else ""
+        )
+        self.btn_blank.setToolTip(hardware_reason or "Check whether the selected PIC memory is blank.")
+        self.btn_read.setToolTip(hardware_reason or "Read the selected target and save a HEX backup.")
+        self.btn_erase.setToolTip(hardware_reason or "Erase user memory on the selected target. Requires hardware preflight.")
+        self.btn_program.setToolTip(op_reason or "Erase, write the selected HEX, then compare read-back when enabled in Settings.")
+        self.btn_verify.setToolTip(op_reason or "Compare the selected HEX image with target memory; this does not identify the target or measure voltage.")
+        self.btn_connect.setToolTip(
+            "Wait for the active operation to finish." if busy else
+            "Connect the Arduino by USB and select Rescan to find its port." if not has_port else
+            "Connect to the selected Arduino and check its ProgramPic handshake."
+        )
+        self.btn_detect.setToolTip(
+            "Connect first. This asks ProgramPic to report a model; Raw silicon ID and socket voltage are not exposed."
+            if not conn else
+            "Ask ProgramPic to report a model. Raw silicon ID and socket voltage are not exposed to this app."
+        )
+
         # Menu actions
+        self.act_ports.setEnabled(not busy and not conn)
         self.act_flash.setEnabled(not busy and not conn)
-        self.act_connect.setEnabled(not busy and not conn)
+        self.act_connect.setEnabled(not busy and not conn and has_port)
+        self.act_connect.setToolTip(
+            "Connect the Arduino by USB and rescan ports first." if not has_port
+            else "Connect to the selected Arduino and check its ProgramPic handshake."
+        )
+        self.act_settings.setEnabled(not busy)
         self.act_disconnect.setEnabled(not busy and conn)
         self.act_detect.setEnabled(not busy and conn)
-        self.act_blank.setEnabled(not busy and conn)
-        self.act_save.setEnabled(not busy and conn)
-        self.act_erase.setEnabled(not busy and conn)
-        self.act_program.setEnabled(not busy and conn and has_hex)
-        self.act_verify.setEnabled(not busy and conn and has_hex)
+        self.act_save.setEnabled(not busy and conn and not target_mismatch)
+        self.act_blank.setEnabled(not busy and conn and not target_mismatch)
+        self.act_erase.setEnabled(not busy and conn and not target_mismatch)
+        self.act_program.setEnabled(not busy and conn and has_hex and hex_fits and not target_mismatch)
+        self.act_program.setToolTip(op_reason)
+        self.act_verify.setEnabled(not busy and conn and has_hex and hex_fits and not target_mismatch)
+        self.act_verify.setToolTip(op_reason)
+        self.act_erase.setToolTip(hardware_reason or "Erase user memory on the selected target.")
 
     # ------------------------------------------------------------------
     # Logging & Background Task Runner
@@ -893,26 +1190,98 @@ class MainWindow(QMainWindow):
     def log(self, msg: str, level: str = "INFO") -> None:
         self.log_pane.log(msg, level)
 
+    def _on_worker_progress(self, line: str) -> None:
+        memory_update = re.fullmatch(
+            r"@MEM\s+([0-9A-Fa-f]+)((?:\s+[0-9A-Fa-f]{4})+)", line.strip()
+        )
+        if memory_update:
+            start = int(memory_update.group(1), 16)
+            values = [int(value, 16) for value in memory_update.group(2).split()]
+            self.circuit_panel.update_memory_write(start, values)
+            return
+        self.log(line, "INFO")
+
     def _set_pct(self, done: int, total: int) -> None:
         if total > 0:
             val = max(0, min(100, int(100 * done / total)))
             self.progress.setValue(val)
 
+    @staticmethod
+    def _actionable_operation_error(label: str, message: str) -> str:
+        lowered = message.casefold()
+        if "read-back verification failed" in lowered:
+            return (
+                f"{message}\n\nThe app cannot confirm that the PIC contains the HEX image. "
+                "This can be caused by a write failure or by unstable target power, VPP, "
+                "clock/data wiring, target selection, or a damaged device. Keep read-back "
+                "verification enabled. Before retrying, power down and confirm VPP is off "
+                "before handling the PIC; check the exact PIC marking, socket orientation, "
+                "and the Point-to-Point Wiring tab against the board and device datasheets. "
+                "If you can safely measure the circuit, verify target VDD and switched VPP "
+                "at the PIC socket. The app cannot measure these voltages."
+            )
+        if label == "Connect Programmer" and (
+            "no programpic response" in lowered
+            or "did not find a compatible pic programmer" in lowered
+        ):
+            return (
+                f"{message}\n\nNo ProgramPic sketch answered. Install firmware, close other "
+                "serial apps, then reconnect. Rescan if the COM port changed."
+            )
+        port_busy_signals = (
+            "access is denied", "access denied", "permission denied", "resource busy",
+            "port is busy", "can't open device", "cannot open device", "ser_open",
+        )
+        if label == "Connect Programmer" and any(
+            signal in lowered for signal in port_busy_signals
+        ):
+            return (
+                f"{message}\n\nThe serial port may be in use. Close Arduino Serial Monitor "
+                "and other serial tools, select Rescan, then retry."
+            )
+        return message
+
     def _cancel_current(self) -> None:
         if self.lane.busy:
             self.session.request_cancel()
             self.lane.cancel()
-            self.log("Cancellation requested — powering off socket safely…", "WARN")
-            self.status_lbl.setText("Cancelling operation & powering off socket…")
+            self.log("Cancellation requested. The current serial command will finish before the host closes the port safely.", "WARN")
+            self.status_lbl.setText("Waiting for the current hardware command to finish safely…")
+
+    PREFLIGHT_TTL_SECONDS = 10 * 60
 
     def _ensure_preflight(self) -> bool:
-        pair = (self.board_key, self.target.name)
-        seen = pair in self._preflight_verified_pairs
-        if show_preflight(self, seen, dev=self.target, board_key=self.board_key):
-            self._preflight_verified_pairs.add(pair)
+        port = self.session.state.port or str(self.cmb_port.currentData() or "")
+        key = (self.board_key, self.target.name, port)
+        now = time.monotonic()
+        checked_at = self._preflight_verified_at.get(key)
+        age = now - checked_at if checked_at is not None else None
+        seen = age is not None and age < self.PREFLIGHT_TTL_SECONDS
+        expired = age is not None and not seen
+        if expired:
+            self._preflight_verified_at.pop(key, None)
+        age_minutes = int(age // 60) if seen and age is not None else 0
+        if show_preflight(
+            self,
+            seen,
+            dev=self.target,
+            board_key=self.board_key,
+            age_minutes=age_minutes,
+            expired=expired,
+        ):
+            self._preflight_verified_at[key] = time.monotonic()
             return True
         self.log("Operation aborted at hardware preflight checklist.", "WARN")
         return False
+
+    def _on_worker_finished(self) -> None:
+        """Refresh UI after the lane is idle and complete a deferred close."""
+        self.progress.setValue(0)
+        self._refresh_actions()
+        QTimer.singleShot(0, self._check_connection_status)
+        if self._closing_after_operation:
+            self._closing_after_operation = False
+            QTimer.singleShot(0, self.close)
 
     def _run_task(self, fn, on_ok, label: str) -> None:
         if self.lane.busy:
@@ -920,24 +1289,51 @@ class MainWindow(QMainWindow):
             return
         self.progress.setValue(0)
         self.status_lbl.setText(f"Running: {label}…")
-        worker = Worker(fn, name=label, parent=self)
-        worker.progressed.connect(lambda line: self.log(line, "INFO"))
+        def guarded_task(progress, percent, cancel):
+            if cancel():
+                raise RuntimeError("Operation cancelled before it started; no hardware command was sent.")
+            return fn(progress, percent, cancel)
+
+        worker = Worker(guarded_task, name=label, parent=self)
+        worker.progressed.connect(self._on_worker_progress)
         worker.percented.connect(self._set_pct)
+        worker.finished.connect(self._on_worker_finished)
 
         def _done_ok(res) -> None:
+            try:
+                on_ok(res)
+            except Exception as exc:
+                detail = report_exception(f"Finishing {label}", exc)
+                self.log(detail, "ERR")
+                self.status_lbl.setText(f"Stopped: {type(exc).__name__}")
+                show_diagnostic_error(self, f"{label} failed", detail, critical=True)
             self._refresh_actions()
-            on_ok(res)
 
         def _done_err(err_msg: str) -> None:
             self.progress.setValue(0)
-            self._refresh_actions()
+            if label.startswith("Program "):
+                self.circuit_panel.finish_memory_write(verified=False, failed=True)
+            elif label.startswith("Verify "):
+                self.circuit_panel.finish_memory_verification()
+            err_msg = self._actionable_operation_error(label, err_msg)
             self.log(err_msg, "ERR")
             self.status_lbl.setText(f"Stopped: {err_msg.splitlines()[0]}")
-            QMessageBox.warning(self, f"{label} stopped", err_msg)
+            show_diagnostic_error(self, f"{label} stopped", err_msg)
+            self._refresh_actions()
 
         worker.succeeded.connect(_done_ok)
         worker.failed.connect(_done_err)
-        self.lane.start(worker)
+        try:
+            self.lane.start(worker)
+        except RuntimeError as exc:
+            detail = report_exception(f"Starting {label}", exc)
+            worker.deleteLater()
+            self.progress.setValue(0)
+            self.status_lbl.setText(f"Stopped: {type(exc).__name__}")
+            self.log(detail, "ERR")
+            self._refresh_actions()
+            show_diagnostic_error(self, f"Could not start {label}", detail, critical=True)
+            return
         self._refresh_actions()
 
     # ------------------------------------------------------------------
@@ -971,6 +1367,9 @@ class MainWindow(QMainWindow):
 
         self.hex_img = img
         self.hex_path = str(path)
+        self.circuit_panel.set_memory_words(
+            img.to_flat(), "Loaded HEX preview — values are not yet written to the PIC."
+        )
         self.settings.add_recent(self.hex_path)
         self._rebuild_recent()
         self._refresh_hex_summary()
@@ -1033,7 +1432,7 @@ class MainWindow(QMainWindow):
         if cur_port:
             self.settings.port = cur_port
 
-        dlg = FlashArduinoDialog(self.settings, self.lane, self)
+        dlg = FlashArduinoDialog(self.settings, self.lane, self, board_key=self.board_key)
 
         def _on_flashed(port: str, bkey: str) -> None:
             b_idx = self.cmb_board.findData(bkey)
@@ -1059,22 +1458,25 @@ class MainWindow(QMainWindow):
                 "Plug in your Arduino programmer and select its serial port first.",
             )
             return
-        baud = self.settings.baud
         self.settings.port = port
 
         def task(progress, _pct, _cancel):
-            return self.session.connect(port=port, baud=baud, progress=progress)
+            return self.session.connect(
+                port=port, baud=PROGRAMMER_BAUD, progress=progress
+            )
 
         def ok(st) -> None:
+            self._reported_target_name = None
+            self._disconnect_notice = ""
+            self._preflight_verified_at.clear()
+            self.lbl_silicon_probe.setText("Programmer report: not queried for this connection")
             self.progress.setValue(100)
             self.log(
                 f"Connected to verified programmer on {st.port} — firmware v{st.firmware} "
                 f"({len(st.supported)} devices supported).",
                 "OK",
             )
-            self.status_lbl.setText(
-                f"Connected: ProgramPic v{st.firmware} on {st.port} (0 V idle)"
-            )
+            self.status_lbl.setText("Programmer connected; socket voltage not measured")
             self.apply_theme(self.settings.theme, self.settings.font_size)
             self._refresh_actions()
 
@@ -1084,9 +1486,15 @@ class MainWindow(QMainWindow):
         if self.lane.busy:
             return
         self.session.disconnect()
-        self.lbl_silicon_probe.setText("Detected silicon: disconnected")
-        self.status_lbl.setText("Disconnected — socket unpowered (0 V safe state)")
-        self.log("Programmer disconnected cleanly (socket powered off).", "INFO")
+        self._reported_target_name = None
+        self._preflight_verified_at.clear()
+        self._disconnect_notice = "Arduino disconnected. Select Connect to start a new verified session."
+        self.lbl_silicon_probe.setText("Programmer report: Arduino disconnected")
+        self.status_lbl.setText("Arduino disconnected — verify VPP is off before handling the target")
+        self.log(
+            "Disconnected from the host. Socket voltage is not measured by this app; verify VPP is off before handling the target.",
+            "INFO",
+        )
         self.apply_theme(self.settings.theme, self.settings.font_size)
         self._refresh_actions()
 
@@ -1103,46 +1511,51 @@ class MainWindow(QMainWindow):
             info, matched = res
             self.progress.setValue(100)
             if matched is not None:
+                self._reported_target_name = matched.name
                 self.lbl_silicon_probe.setText(
-                    f"Detected silicon: {matched.display_name} (ID 0x{info.device_id:04X}, "
-                    f"Cfg 0x{info.config_word:04X})"
+                    f"ProgramPic reports: {matched.display_name} (raw ID/config not exposed by host)"
                 )
                 self.log(
-                    f"Auto-detected {matched.display_name} (DeviceID=0x{info.device_id:04X}).",
+                    f"ProgramPic reports {matched.display_name}. The host does not expose raw ID/config values to this app; confirm the package marking and selected target before programming.",
                     "OK",
                 )
                 idx = self.cmb_mcu.findData(matched.name)
                 if idx >= 0 and idx != self.cmb_mcu.currentIndex():
                     ans = QMessageBox.question(
                         self,
-                        "Silicon detected",
-                        f"Detected {matched.display_name} in socket (currently selected: "
-                        f"{self.target.display_name}).\n\nSwitch Target MCU to {matched.display_name}?",
+                        "Programmer-reported target",
+                        f"ProgramPic reports {matched.display_name}, while the selected target is "
+                        f"{self.target.display_name}.\n\nSwitch the target selection to "
+                        f"{matched.display_name}? The app does not receive raw silicon ID values.",
                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                         QMessageBox.StandardButton.Yes,
                     )
                     if ans == QMessageBox.StandardButton.Yes:
                         self.cmb_mcu.setCurrentIndex(idx)
-                self.status_lbl.setText(f"Detected {matched.display_name} — socket returned to 0 V")
-            else:
                 self.lbl_silicon_probe.setText(
-                    f"Detected raw ID: 0x{info.device_id:04X} (no auto-ID or empty socket)"
+                    f"ProgramPic reports: {matched.display_name} (raw ID/config not exposed by host)"
+                )
+                self.status_lbl.setText(
+                    f"Programmer reports {matched.display_name}; socket voltage not measured"
+                )
+            else:
+                self._reported_target_name = None
+                label = info.device_name or "unknown"
+                self.lbl_silicon_probe.setText(
+                    f"ProgramPic reports an unsupported target: {label}; not auto-selected"
                 )
                 self.log(
-                    f"Probe returned DeviceID=0x{info.device_id:04X} ({info.device_name or 'manual-select MCU'}).",
+                    f"ProgramPic reported unsupported target {label}; destructive operations remain blocked unless a supported target is explicitly selected and independently validated.",
                     "WARN",
                 )
-                QMessageBox.information(
+                QMessageBox.warning(
                     self,
-                    "Silicon probe result",
-                    f"Raw Device ID: 0x{info.device_id:04X}\n"
-                    f"Config Word:   0x{info.config_word:04X}\n\n"
-                    "Older chips such as PIC16F84 have no silicon Device ID and must be "
-                    "selected manually. If using a newer PIC (e.g. PIC16F84A / PIC16F628A / "
-                    "PIC16F877A), check 13 V VPP, JP3 jumper, and Pin-1 orientation.",
+                    "Unsupported or unidentified target",
+                    "The host did not return a supported PIC model. No raw device ID or config word is exposed by the upstream host command. For no-ID devices, select the exact model manually and follow its datasheet; verify wiring and VPP before any destructive action.",
                 )
+            self._refresh_actions()
 
-        self._run_task(task, ok, "Auto-Detect PIC")
+        self._run_task(task, ok, "Query Programmer for Target Model")
 
     def _program(self) -> None:
         if not self.session.connected or self.hex_img is None:
@@ -1156,11 +1569,23 @@ class MainWindow(QMainWindow):
             return
 
         if self.settings.confirm_erase or not do_verify:
-            summary = build_summary(dev, img)
+            summary = build_summary(
+                dev,
+                img,
+                do_verify=do_verify,
+                preserve_calibration=self.chk_preserve_cal.isChecked(),
+            )
             fname = Path(self.hex_path).name if self.hex_path else "memory_buffer.hex"
             if not confirm_program(self, dev, fname, summary, do_verify):
                 self.log("Programming cancelled by user.", "WARN")
                 return
+
+        self.circuit_panel.set_memory_words(
+            img.to_flat(),
+            "Programming started — values are not confirmed until acknowledged and read back.",
+            row_status="Pending",
+        )
+        self.circuit_panel.tabs.setCurrentWidget(self.circuit_panel.memory_page)
 
         def task(progress, pct, _cancel):
             return self.session.program_hex(
@@ -1174,11 +1599,30 @@ class MainWindow(QMainWindow):
 
         def ok(summary_text: str) -> None:
             self.progress.setValue(100)
-            self.log(f"Programming complete — {dev.display_name} verified & powered off.", "OK")
-            self.status_lbl.setText(
-                f"SUCCESS — {dev.display_name} programmed & verified (0 V safe state)"
+            self.circuit_panel.finish_memory_write(
+                verified=do_verify,
+                skipped_address=dev.config_start + 6 if do_verify else None,
             )
-            QMessageBox.information(self, "Programming Successful", summary_text)
+            if do_verify:
+                self.log(
+                    f"Programming finished — read-back comparison passed for {dev.display_name}.",
+                    "OK",
+                )
+                status = f"Read-back passed for {dev.display_name}"
+                title = "Read-back verification passed"
+            else:
+                self.log(
+                    f"Programming command finished for {dev.display_name}; read-back comparison was disabled and not performed.",
+                    "WARN",
+                )
+                status = f"Write finished for {dev.display_name}; verification skipped"
+                title = "Programming finished — verification skipped"
+            self.status_lbl.setText(status + "; socket voltage not measured")
+            QMessageBox.information(
+                self,
+                title,
+                summary_text + "\n\nThe app does not measure socket voltage. Verify VPP is off before handling the target.",
+            )
 
         self._run_task(task, ok, f"Program {dev.display_name}")
 
@@ -1203,6 +1647,9 @@ class MainWindow(QMainWindow):
 
         def ok(msg: str) -> None:
             self.progress.setValue(100)
+            self.circuit_panel.finish_memory_write(
+                verified=True, skipped_address=dev.config_start + 6
+            )
             self.log(msg, "OK")
             self.status_lbl.setText(msg)
             QMessageBox.information(self, "Verification Passed", msg)
@@ -1247,9 +1694,14 @@ class MainWindow(QMainWindow):
             self.progress.setValue(100)
             self.hex_img = img
             self.hex_path = ""
+            self.circuit_panel.set_memory_words(
+                img.to_flat(),
+                f"Read-back image loaded from {dev.display_name}; values are displayed from the PIC read operation.",
+                row_status="Read from PIC",
+            )
             self._refresh_hex_summary()
             self._refresh_actions()
-            self.circuit_panel.tabs.setCurrentIndex(2)
+            self.circuit_panel.tabs.setCurrentWidget(self.circuit_panel.memory_page)
 
             path, _ = QFileDialog.getSaveFileName(
                 self,
@@ -1264,10 +1716,12 @@ class MainWindow(QMainWindow):
                 self.hex_path = path
                 self._refresh_hex_summary()
                 self.log(f"Saved {dev.display_name} readout to {path}", "OK")
-                self.status_lbl.setText(f"Saved backup: {Path(path).name} (0 V safe state)")
+                self.status_lbl.setText(
+                    f"Saved backup: {Path(path).name}; socket voltage not measured"
+                )
             else:
                 self.log(
-                    f"Read {dev.display_name} into HEX Memory Map buffer (file save skipped).",
+                    f"Read {dev.display_name} into an in-memory HEX backup (file save skipped).",
                     "INFO",
                 )
                 self.status_lbl.setText(f"Read {dev.display_name} into memory inspector")
@@ -1278,12 +1732,12 @@ class MainWindow(QMainWindow):
         if not self.session.connected:
             return
         dev = self.target
-        if not confirm_erase(self, dev):
-            self.log("Bulk erase cancelled.", "WARN")
+        preserve = self.chk_preserve_cal.isChecked()
+        if not confirm_erase(self, dev, preserve_calibration=preserve):
+            self.log("Bulk erase cancelled or blocked by calibration-preservation safety gate.", "WARN")
             return
         if not self._ensure_preflight():
             return
-        preserve = self.chk_preserve_cal.isChecked()
 
         def task(progress, pct, _cancel):
             return self.session.erase_chip(
@@ -1326,7 +1780,9 @@ class MainWindow(QMainWindow):
             f"Host Arduino Board:  {bw.board_name} ({bw.mcu_label})\n"
             f"Programmer Port:     {st.port or '(disconnected)'}\n"
             f"Programmer Firmware: {st.firmware or '—'}\n"
-            f"Verified Link:       {'YES' if st.verified else 'NO'}\n\n"
+            f"Host Handshake:      {'Passed' if st.verified else 'Not connected'}\n"
+            f"Raw target ID:       Not exposed by host\n"
+            f"Socket voltage:      Not measured by app\n\n"
             f"Target PIC MCU:      {self.target.display_name} ({pw.package})\n"
             f"Hardware Mode:       {'ZIF-18 Socket (JP3 = ' + str(pw.jp3_position) + ')' if pw.uses_zif else '6-Wire External ICSP'}\n"
             f"Program Flash:       {self.target.program_words} words (14-bit)\n"
@@ -1362,24 +1818,44 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(QUrl(ARDPICPROG_URL))
 
     def closeEvent(self, ev) -> None:  # noqa: N802
+        if self._closing_after_operation:
+            ev.ignore()
+            return
         if self.lane.busy:
             ans = QMessageBox.question(
                 self,
                 "Hardware operation running",
-                "A programming or read operation is still running.\n"
-                "Abort operation, power off the socket, and exit?",
+                "A hardware operation is still running.\n\n"
+                "Choose Yes to request cancellation. The app will remain open until the "
+                "serial host has finished safely; it will not force-kill an active PIC write.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
             if ans != QMessageBox.StandardButton.Yes:
                 ev.ignore()
                 return
+
+            self._closing_after_operation = True
             self.session.request_cancel()
             self.lane.cancel()
-            if self.lane.current is not None:
-                self.lane.current.wait(2500)
+            self.status_lbl.setText(
+                "Close requested — waiting for the active hardware command to finish safely."
+            )
+            self.log(
+                "Application close deferred; cancellation requested and the active host operation "
+                "will be allowed to close its serial port safely.",
+                "WARN",
+            )
+            self._refresh_actions()
+            ev.ignore()
+            return
 
-        self.session.disconnect()
-        self.settings.geometry = self.saveGeometry()
-        self.settings.window_state = self.saveState()
+        try:
+            self.session.disconnect()
+            self.settings.geometry = self.saveGeometry()
+            self.settings.window_state = self.saveState()
+        except Exception as exc:
+            detail = report_exception("Saving application state during exit", exc)
+            self.log(detail, "ERR")
+            show_diagnostic_error(self, "Could not save application settings", detail)
         super().closeEvent(ev)

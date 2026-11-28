@@ -5,39 +5,45 @@
 
 ---
 
+## Status: downloadable software candidate, not hardware-validated
+
+The Windows build compiles the firmware and smoke-tests installation, launch, and uninstall. The installer is published on the GitHub Releases page, but no physical Arduino/PIC hardware acceptance or clean-machine validation has been completed. Treat this as a software candidate, not proof that programming is ready for use; do not perform destructive programming with an unvalidated build.
+
 ## 1. Hardware you need
 
-Follow the reference circuit (official Ho-Ro schematic):
-**[https://github.com/Ho-Ro/ArdPicProg/blob/master/ArdPicProg_1_8_horo.png](https://github.com/Ho-Ro/ArdPicProg/blob/master/ArdPicProg_1_8_horo.png)**
+The firmware uploaded by this app uses the following Arduino Nano wiring. The upstream Ho-Ro schematic and photographs below may show a different pinout and polarity; treat them as historical references only, not instructions for this firmware.
 
-* An Arduino (Uno / Nano / Pro Mini / Mega / Leonardo) + USB cable
-* The ArdPicProg shield (13 V VPP supply + ZIF socket + ICSP header)
-  — or the equivalent wiring:
-  * **D2 → VDD**, **D3 → MCLR/VPP**, **D4 → CLK**, **D5 → DATA**
-    (ProgramPic v1.8.horo pinout)
-  * External **16–20 V** input for the 13 V VPP rail (red LED = VPP OK)
-* The target PIC (e.g. PIC16F84A) in the ZIF socket, pin 1 aligned,
-  lever locked
-* Jumper **JP3**: position 1-2 for 18-pin chips (PIC16F84A),
-  2-3 for 8-pin chips (PIC12F675)
+| Arduino Nano pin | Firmware signal | PIC16F84A connection | Function / notes |
+|---|---|---|---|
+| A1 | `PIN_MCLR` | Pin 4, MCLR/VPP, through the external VPP switching circuit | HIGH = reset / VPP off; LOW = select approximately 13 V VPP. A1 must only drive the low-voltage switch input—never connect the VPP rail directly to an Arduino pin. |
+| D2 | `PIN_VDD` | Pin 14, VDD | HIGH = target 5 V on; LOW = off. Fit 100 nF between PIC VDD and VSS near the device. |
+| D4 | `PIN_CLOCK` | Pin 12, RB6/PGC | ICSP clock. |
+| D7 | `PIN_DATA` | Pin 13, RB7/PGD | Bidirectional ICSP data. |
+| A5 | `PIN_ACTIVITY` | Activity LED anode through a current-limiting resistor; cathode to GND | Indicates serial-command and read/write activity. |
+| GND | Common ground | Pin 5, VSS | Join Arduino, PIC, and VPP/VDD circuit grounds. |
+
+Use an Arduino (Nano / Uno / Pro Mini / Mega / Leonardo) and a PIC target. The pin assignments above are the firmware profile; check the exact board pin aliases and PIC package datasheet before wiring. The VPP switching circuit—not A1 itself—must route the external programming voltage to MCLR/VPP. Keep the PIC's documented VPP input isolated from Arduino GPIO and verify supply polarity/voltage before attaching a device.
+
+The **Circuit Reference** tab displays the exact user-supplied PNG as an **unverified example circuit for PIC16F84A**. The adjacent **Point-to-Point Wiring** tab shows the selected board/PIC firmware map separately. The example depicts a 24 V input and an LM317 regulator with a marked 13 V output; it may not match the selected firmware wiring or actual programmer. Do not treat it as a validated schematic or wiring instruction. Verify the exact datasheet, circuit, and VPP supply before wiring, and never connect VPP directly to an Arduino pin. Zoom using the controls or Ctrl+mouse wheel; the original PNG can be opened from the Circuit Reference tab.
+
+For a PIC16F84A in the published ZIF shield, JP3 is commonly set to 1-2; an 8-pin PIC such as PIC12F675 may require JP3=2-3. Confirm the exact board schematic before selecting jumper positions.
 
 ## 2. First-time setup (once)
 
-### Step 1 — Flash Arduino Firmware…
-1. Menu **Programmer → Flash Arduino Firmware…**
-2. Pick your board (e.g. *Arduino Uno (ATmega328P)*) and the COM port
-   (use **Rescan** after plugging in).
-3. Press **Flash Firmware** and confirm. Keep USB connected.
-   * If upload fails: Nano → try *Old Bootloader* variant;
-     Leonardo/Micro → press reset twice when prompted.
-4. `avrdude` is bundled in the Windows `.exe` release (no manual install).
-   (Linux/macOS users: install via package manager or download from
-   [https://github.com/avrdudes/avrdude/releases](https://github.com/avrdudes/avrdude/releases).)
+### Step 1 — Install the Windows candidate
+1. Open the project's [GitHub Releases page](https://github.com/Ahmed-Emad-EL-Din/Arduino-PIC-Programmer/releases) and download the latest Windows installer or installer-only ZIP, plus its `.sha256` sidecar.
+2. Verify `Arduino-PIC-Programmer-Setup-x64.exe` against its checksum before installing.
+3. Run Setup. It installs per-user, adds a Start menu shortcut, registers in Windows Installed Apps, and includes an uninstaller. The release remains a software candidate—not a hardware-validated release.
+4. SmartScreen can warn on unsigned or not-yet-reputed apps. Do not disable it or bypass it for an unvalidated candidate; see the README's SmartScreen note.
 
-### Step 2 — Connect & verify
-1. Home page **Step 2 → Connect** (or `Ctrl+P`).
-2. The status chip turns green **Programmer: ✓ vX** — the handshake
-   passed. If it fails, close the Arduino Serial Monitor and retry.
+### Step 2 — Install ProgramPic firmware if needed
+1. In the **Programmer** card, select the Arduino model and port, then choose **Install Firmware…**.
+2. The dialog tells you if firmware upload isn't supported for the selected board. Leonardo/Micro must be flashed using Arduino IDE. For Nano, the app always tries the 115200-baud bootloader first and retries at 57600 only if it cannot synchronize; the displayed old/new bootloader profile reflects the successful speed. This upload speed is separate from the ProgramPic runtime serial link, which is 9600 baud. The runtime rate is not a Microchip PICkit setting: this project uses an Arduino running ProgramPic. Reflash an older sketch if it was built for a different runtime baud before trying to connect.
+3. Upload replaces the Arduino's current sketch. Keep USB connected and remove/reinstall the reset capacitor as directed by the dialog.
+
+### Step 3 — Connect & verify
+1. In the **Programmer** card, select the Arduino port and click **Connect** (or use `Ctrl+P`). The ProgramPic runtime link is fixed at **9600 baud**; the app resets any stale saved speed to 9600. Nano bootloader upload uses a separate speed.
+2. A successful handshake shows the firmware version. If the port is busy, close Arduino Serial Monitor/other serial tools, select **Rescan**, and retry.
 
 ## 3. Every-day programming flow
 
@@ -49,30 +55,18 @@ Follow the reference circuit (official Ho-Ro schematic):
 
 Then:
 
-1. **Preflight checklist** appears once per session — tick every item
-   (VPP LED, socket, jumper, voltage).
-2. **Confirmation** shows exactly what will happen
-   (erase → write → verify → safe state). Read it, then continue.
-3. Watch the progress bar and Activity Log:
-   ```
-   Step 1/5 — verify chip identity …     Detected: PIC16F84A … identity OK
-   Step 2/5 — erase chip …
-   Step 3/5 — write program memory …
-   Step 4/5 — READ BACK & VERIFY …       ✓ verify passed
-   Step 5/5 — power off socket (safe state) …
-   ```
+1. Review the hardware preflight prompts and confirm the physical VPP supply, target orientation, wiring, and jumper independently.
+2. Confirm the operation only after checking the target marking and the HEX memory map. A green/recognized model is not proof that raw silicon ID bits were measured; the current host interface does not expose raw ID/config values to the GUI.
+3. The host output and a read-back comparison are shown when available. These paths have not yet been verified on a real programmer, so do not treat a passing software test as hardware acceptance.
 
-The dialog ends with **SUCCESS** only after verification passes.
+The app must not be considered production-ready until Windows and physical-device acceptance testing is complete.
+
+The hardware preflight checklist is tied to the selected board, PIC, and serial port. After you confirm all required checks, the app carries that checklist forward for the same setup for up to ten minutes; changing board or PIC, disconnecting, or letting the timer expire requires another check. Use **Clear all** and recheck if anything in the physical setup changes. **Check all items** is only a convenience after you have physically inspected every item; the checkboxes do not measure wiring or voltage. During programming, the **PIC Memory** tab reports words acknowledged by the host as writes complete. Those acknowledgements are not proof of stored values: only the final read-back comparison can mark them verified. A disappearing USB port changes the status to **Disconnected** and disables PIC actions until the programmer is reconnected and verified.
 
 ## 4. Other operations (Programmer menu)
 
-* **Erase Only…** — bulk erase with calibration/ID preservation.
-* **Verify vs File** — read the chip and compare against the loaded HEX
-  without writing.
-* **Read Chip → Save HEX…** — backup the chip to an Intel HEX file
-  (`Ctrl+S`).
-* **Device / Programmer Info** — port, firmware version, device ID,
-  config word, identity-verification status.
+* **Erase Only…**, **Verify vs File**, and **Read Chip** are candidate UI operations. Their behavior has not yet been accepted on physical hardware; do not rely on erase/calibration-preservation guarantees before the hardware validation phase passes.
+* **Device / Programmer Info** — selected board and target, port, firmware version, package and memory sizes. The upstream ArdPicProg command-line host does not expose raw ID/config words to the GUI; it validates the selected model when each operation starts.
 
 ## 5. Menus overview
 
@@ -81,7 +75,7 @@ The dialog ends with **SUCCESS** only after verification passes.
   Connect/Disconnect (`Ctrl+P`), Detect Chip (`F6`), Device Info,
   Erase…, Program… (`Ctrl+R`), Verify, Read
 * **Settings** — Connection (port/baud/board/MCU), Appearance
-  (dark/light, font size), Safety (confirmations, auto-verify)
+  (dark/light/high contrast, font size), Safety (confirmations, auto-verify)
 * **View** — Show Log (`Ctrl+L`), Zoom In/Out (`Ctrl +/-`), Reset,
   Toggle Theme (`Ctrl+T`)
 * **Help** — User Guide, Wiring Diagram, ProgramPic Firmware Help,
@@ -91,19 +85,22 @@ The dialog ends with **SUCCESS** only after verification passes.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
+| No ProgramPic response | Firmware missing, wrong port, or port busy | Install the matching ProgramPic firmware and reconnect at 9600 baud. Close other serial apps; rescan if the port is missing. |
 | “No response from the Arduino” | Wrong port / firmware missing / Serial Monitor open | Rescan ports, flash firmware, close Serial Monitor |
 | “avrdude failed — not in sync” | Wrong board variant or port | Try Nano *Old Bootloader*; press reset and retry |
 | `DEVICE failed` | Empty socket, VPP off, chip backwards | Check red VPP LED, pin-1 orientation, lever |
-| “Chip reports X but Y is selected” | Wrong MCU selected or wrong chip | The write is **blocked** — fix the selection/chip |
-| Verify failed after write | Unstable VPP, bad chip, wiring | Check 13 V supply/wiring; try another chip |
+| Detected model differs from selected target | Wrong target selection or ambiguous host output | Stop; recheck package marking and selection. Raw ID values are not shown by the app. |
+| Read-back verification failed | The app could not confirm the PIC matches the HEX; this may be a write or read-path issue, unstable VDD/VPP, incorrect target, wiring, or a damaged device | Do not treat the chip as programmed or disable verification. Power down and confirm VPP is off before handling it; check the exact target marking/orientation and Point-to-Point Wiring against the board and PIC datasheets. If safe, measure target VDD and switched VPP at the socket; the app cannot measure them. Use a known-good device only after the circuit is confirmed. |
 | Port busy / access denied | Another program using the port | Close MPLAB/QPICkit/Serial Monitor |
 | HEX “outside memory map” | HEX from a different MCU | Load the HEX built for your selected target |
+
+The ProgramPic-to-app runtime link uses 9600 baud. Nano firmware upload is a separate bootloader connection: it tries 115200 first and retries at 57600 if synchronization fails. If upload fails, check the selected port and close other serial apps.
+
+For an unexpected operation error, use **Copy details** in the error dialog and share that text along with the exported Activity Log. The full rotating diagnostic log is saved at the path shown in the error dialog (up to 2 MB per file, with three backups). If a hardware operation is active when you close the app, the app requests cancellation and stays open until the serial host exits safely; do not force-terminate it while it is writing to a PIC.
 
 ## 7. Safety notes
 
 * The 13 V VPP supply must never be plugged into the Arduino power jack.
 * Do not touch the ZIF/ICSP contacts while programming.
-* The app forces **safe state (PWROFF)** after every operation, on
-  errors, on cancel, and when it closes.
-* ProgramPic itself auto-power-offs after 2 s without host activity —
-  even if the PC crashes mid-operation.
+* The upstream ArdPicProg host sends `PWROFF` during normal shutdown; a force-killed process may bypass orderly shutdown. Hardware safety behavior on errors, cancellation, or power loss has not been validated here.
+* The upstream ProgramPic source documents inactivity power-off behavior, but this application has not yet passed a physical test of that safeguard.

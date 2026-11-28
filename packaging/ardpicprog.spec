@@ -1,39 +1,56 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec — produces the publishable desktop EXE.
+"""PyInstaller spec for the portable Windows desktop package.
 
-Build (Windows):   packaging\\build.bat
-Build (Linux/mac): packaging/build.sh
-CI:                .github/workflows/build-windows.yml
+The release is an onedir bundle: users extract the ZIP and launch the visible
+Arduino-PIC-Programmer.exe. This avoids fragile one-file extraction for Qt,
+firmware, and the ArdPicProg host helper.
 """
-import sys
 from pathlib import Path
 
-ROOT = Path(SPECPATH).resolve().parent   # noqa: F821 — SPECPATH provided by PyInstaller
+ROOT = Path(SPECPATH).resolve().parent  # SPECPATH is the packaging directory
 SRC = ROOT / "src"
 
-block_cipher = None
 
-datas = [
-    (str(ROOT / "firmware" / "precompiled"), "firmware/precompiled"),
-    (str(ROOT / "firmware" / "source"), "firmware/source"),
-    (str(ROOT / "docs"), "docs"),
-    (str(ROOT / "assets"), "assets"),
-]
+def add_if_present(path: Path, destination: str, datas: list) -> None:
+    if path.exists():
+        datas.append((str(path), destination))
 
-# bundle avrdude when present in tools/ (build scripts download it first)
-tools = ROOT / "tools"
-if tools.is_dir():
-    datas.append((str(tools), "tools"))
+
+# Include runtime data and the editable ProgramPic source. Keep development
+# docs, source assets, and build helpers out of the portable package.
+datas = []
+for path, destination in (
+    (ROOT / "docs" / "USER_GUIDE.md", "docs"),
+    (ROOT / "firmware" / "source" / "ProgramPic" / "ProgramPic.ino", "firmware/source/ProgramPic"),
+    (ROOT / "assets" / "app-icon.ico", "assets"),
+    (ROOT / "assets" / "app-icon.png", "assets"),
+    (ROOT / "assets" / "reference" / "circuit-reference.png", "assets/reference"),
+    (ROOT / "tools" / "ardpicprog.exe", "tools"),
+    (ROOT / "tools" / "avrdude" / "avrdude.exe", "tools/avrdude"),
+    (ROOT / "tools" / "avrdude" / "avrdude.conf", "tools/avrdude"),
+    (ROOT / "tools" / "avrdude" / "AVRDUDE-LICENSE.txt", "licenses"),
+    (ROOT / "vendor" / "ArdPicProg" / "COPYING", "licenses"),
+    (ROOT / "vendor" / "ArdPicProg" / "UPSTREAM.md", "licenses"),
+    (ROOT / "LICENSE", "licenses"),
+    (ROOT / "LGPL-3.0.txt", "licenses"),
+    (ROOT / "THIRD_PARTY_NOTICES.md", "licenses"),
+):
+    add_if_present(path, destination, datas)
+
+for path in sorted((ROOT / "firmware" / "precompiled").glob("*.hex")):
+    datas.append((str(path), "firmware/precompiled"))
+
+for path in sorted((ROOT / "tools" / "avrdude").glob("*.dll")):
+    datas.append((str(path), "tools/avrdude"))
 
 hiddenimports = [
     "serial",
     "serial.tools.list_ports",
-    "PySide6.QtSvg",
 ]
 
-a = Analysis(
+analysis = Analysis(
     [str(SRC / "main.py")],
-    pathex=[str(SRC)],
+    pathex=[str(SRC), str(ROOT)],
     binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,
@@ -41,15 +58,12 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=["tkinter", "unittest", "pydoc_data"],
-    cipher=block_cipher,
     noarchive=False,
 )
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
+pyz = PYZ(analysis.pure)
 exe = EXE(
     pyz,
-    a.scripts,
+    analysis.scripts,
     [],
     exclude_binaries=True,
     name="Arduino-PIC-Programmer",
@@ -57,19 +71,17 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=False,               # GUI app — no console window
+    console=False,
     disable_windowed_traceback=False,
-    icon=str(ROOT / "assets" / "icon.ico") if sys.platform.startswith("win")
-    else str(ROOT / "assets" / "icon.png"),
+    icon=str(ROOT / "assets" / "app-icon.ico"),
+    version=str(ROOT / "packaging" / "version_info.txt"),
 )
-
-coll = COLLECT(
+collection = COLLECT(
     exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
+    analysis.binaries,
+    analysis.zipfiles,
+    analysis.datas,
     strip=False,
     upx=False,
-    upx_exclude=[],
     name="Arduino-PIC-Programmer",
 )

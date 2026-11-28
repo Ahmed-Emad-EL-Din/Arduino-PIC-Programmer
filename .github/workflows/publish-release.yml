@@ -1,0 +1,80 @@
+name: Publish Windows release assets
+
+on:
+  workflow_run:
+    workflows: ["Windows desktop package"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') &&
+      startsWith(github.event.workflow_run.head_branch, 'v') &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download installer artifacts from the successful tagged build
+        uses: actions/download-artifact@v7
+        with:
+          name: Arduino-PIC-Programmer-Windows-x64-installer
+          path: ${{ runner.temp }}/release-assets/installer
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download installer-only ZIP from the successful tagged build
+        uses: actions/download-artifact@v7
+        with:
+          name: Arduino-PIC-Programmer-Installer-Windows-x64
+          path: ${{ runner.temp }}/release-assets/zip
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify checksums and publish release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.workflow_run.head_branch }}
+          ASSET_ROOT: ${{ runner.temp }}/release-assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          setup="$ASSET_ROOT/installer/Arduino-PIC-Programmer-Setup-x64.exe"
+          setup_sum="$setup.sha256"
+          zip="$ASSET_ROOT/zip/Arduino-PIC-Programmer-Installer-Windows-x64.zip"
+          zip_sum="$zip.sha256"
+          test -f "$setup"
+          test -f "$setup_sum"
+          test -f "$zip"
+          test -f "$zip_sum"
+          (cd "$(dirname "$setup")" && sha256sum -c "$(basename "$setup_sum")")
+          (cd "$(dirname "$zip")" && sha256sum -c "$(basename "$zip_sum")")
+
+          cat > "$RUNNER_TEMP/release-notes.md" <<EOF
+          Windows x64 installer for Arduino-PIC Programmer $RELEASE_TAG.
+
+          Download the setup executable and its SHA-256 sidecar, or the installer-only ZIP and its sidecar. Verify the checksum before installing.
+
+          **Hardware status:** This is a software candidate. CI compiles the firmware and smoke-tests the desktop installer, but no physical Arduino/PIC hardware acceptance has been performed. Do not treat this release as proof of hardware compatibility or use it for destructive programming until hardware validation is completed.
+
+          The installer may be unsigned unless a trusted Authenticode certificate is configured; Windows SmartScreen may warn.
+          EOF
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --title "Arduino-PIC Programmer $RELEASE_TAG" \
+              --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            gh release create "$RELEASE_TAG" \
+              --verify-tag \
+              --title "Arduino-PIC Programmer $RELEASE_TAG" \
+              --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
+
+          gh release upload "$RELEASE_TAG" \
+            "$setup" "$setup_sum" "$zip" "$zip_sum" \
+            --clobber

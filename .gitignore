@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+/artifacts/
+/tools/
+/firmware/precompiled/
+/firmware/build/
+*.spec.bak
+*.egg-info/
+*.log
+.env
+.DS_Store
+Thumbs.db

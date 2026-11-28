@@ -1,0 +1,407 @@
+name: Windows desktop package
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Set up MSYS2 for the upstream Windows host helper
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gcc
+
+      - name: Build and smoke-test ArdPicProg Windows host
+        shell: msys2 {0}
+        run: bash packaging/build_host_windows.sh
+
+      - name: Install Arduino CLI and AVR core
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Compile ProgramPic firmware and stage avrdude
+        shell: pwsh
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr@1.8.6
+          ./packaging/build_firmware.ps1
+
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run static checks and test suite
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONPATH: "${{ github.workspace }}/src;${{ github.workspace }}"
+        run: |
+          python -m compileall -q src app
+          if ($LASTEXITCODE -ne 0) { throw 'Python compileall failed.' }
+          New-Item -ItemType Directory -Force 'test-results' | Out-Null
+          python -m pytest -q --junitxml=test-results/junit.xml
+          $TestExit = $LASTEXITCODE
+          if ($TestExit -ne 0 -and (Test-Path 'test-results/junit.xml')) {
+            [xml]$Report = Get-Content 'test-results/junit.xml' -Raw
+            $FailureNodes = $Report.SelectNodes('//failure | //error')
+            $Details = ($FailureNodes | ForEach-Object {
+              $Case = $_.ParentNode
+              $Text = ($_.GetAttribute('message') + ' ' + $_.InnerText) -replace '\s+', ' '
+              "$($Case.GetAttribute('classname')).$($Case.GetAttribute('name')): $Text"
+            }) -join ' | '
+            if ($Details.Length -gt 2000) { $Details = $Details.Substring(0, 2000) }
+            "### Pytest failure`n`n$Details" | Add-Content $env:GITHUB_STEP_SUMMARY
+            Write-Output "::error title=Pytest failure::$Details"
+          }
+          if ($TestExit -ne 0) { exit $TestExit }
+          'Python compileall and pytest passed.' | Add-Content $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload test report for review
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Arduino-PIC-Programmer-test-report
+          path: test-results/junit.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload real Qt UI screenshots for review
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Arduino-PIC-Programmer-UI-screenshots
+          path: artifacts/ui/*.png
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Build portable PyInstaller application
+        run: python -m PyInstaller --clean --noconfirm packaging/ardpicprog.spec
+
+      - name: Validate package inputs
+        shell: pwsh
+        run: |
+          $Package = 'dist/Arduino-PIC-Programmer'
+          $Internal = Join-Path $Package '_internal'
+          $Required = @(
+            "$Package/Arduino-PIC-Programmer.exe",
+            "$Internal/tools/ardpicprog.exe",
+            "$Internal/tools/avrdude/avrdude.exe",
+            "$Internal/tools/avrdude/avrdude.conf",
+            "$Internal/docs/USER_GUIDE.md",
+            "$Internal/assets/reference/circuit-reference.png",
+            "$Internal/assets/app-icon.ico",
+            "$Internal/assets/app-icon.png",
+            "$Internal/licenses/LICENSE",
+            "$Internal/licenses/LGPL-3.0.txt",
+            "$Internal/licenses/THIRD_PARTY_NOTICES.md",
+            "$Internal/licenses/COPYING",
+            "$Internal/licenses/UPSTREAM.md"
+          )
+          foreach ($Path in $Required) {
+            if (!(Test-Path $Path)) { throw "Required package file missing: $Path" }
+          }
+          $AllowedData = @{
+            "$Internal/firmware" = @('precompiled/uno.hex', 'precompiled/nano_new.hex', 'precompiled/nano_old.hex', 'precompiled/pro_mini_5v.hex', 'precompiled/mega2560.hex', 'precompiled/leonardo.hex', 'precompiled/micro.hex', 'source/ProgramPic/ProgramPic.ino')
+            "$Internal/docs" = @('USER_GUIDE.md')
+            "$Internal/assets" = @('app-icon.ico', 'app-icon.png', 'reference/circuit-reference.png')
+          }
+          foreach ($Root in $AllowedData.Keys) {
+            $AbsoluteRoot = (Resolve-Path $Root).Path
+            $Actual = @(Get-ChildItem $AbsoluteRoot -Recurse -File | ForEach-Object {
+              [IO.Path]::GetRelativePath($AbsoluteRoot, $_.FullName).Replace('\', '/')
+            })
+            $Expected = @($AllowedData[$Root])
+            $Unexpected = @($Actual | Where-Object { $_ -notin $Expected })
+            $Missing = @($Expected | Where-Object { $_ -notin $Actual })
+            if ($Unexpected.Count -or $Missing.Count) {
+              throw "Unexpected runtime data in $Root. Unexpected: $($Unexpected -join ', '); missing: $($Missing -join ', ')"
+            }
+          }
+          $ToolRoot = (Resolve-Path "$Internal/tools").Path
+          $ActualTools = @(Get-ChildItem $ToolRoot -Recurse -File | ForEach-Object {
+            [IO.Path]::GetRelativePath($ToolRoot, $_.FullName).Replace('\', '/')
+          })
+          $ExpectedTools = @('ardpicprog.exe', 'avrdude/avrdude.exe', 'avrdude/avrdude.conf') + @(
+            Get-ChildItem 'tools/avrdude' -File -Filter '*.dll' | ForEach-Object { "avrdude/$($_.Name)" }
+          )
+          $UnexpectedTools = @($ActualTools | Where-Object { $_ -notin $ExpectedTools })
+          $MissingTools = @($ExpectedTools | Where-Object { $_ -notin $ActualTools })
+          if ($UnexpectedTools.Count -or $MissingTools.Count) {
+            throw "Unexpected bundled tools. Unexpected: $($UnexpectedTools -join ', '); missing: $($MissingTools -join ', ')"
+          }
+          $ProductVersion = (Get-Item "$Package/Arduino-PIC-Programmer.exe").VersionInfo.ProductVersion
+          if ($ProductVersion -notlike '2.2.8*') { throw "Unexpected application product version: $ProductVersion" }
+          $BoardKeys = @('uno', 'nano_new', 'nano_old', 'pro_mini_5v', 'mega2560', 'leonardo', 'micro')
+          foreach ($Key in $BoardKeys) {
+            $Firmware = "$Internal/firmware/precompiled/$Key.hex"
+            if (!(Test-Path $Firmware)) { throw "ProgramPic firmware missing for $Key." }
+          }
+          $QtPlatform = Get-ChildItem $Internal -Recurse -File -Filter 'qwindows.dll' | Select-Object -First 1
+          if (!$QtPlatform) { throw 'Bundled Qt Windows platform plugin (qwindows.dll) missing.' }
+          $SourceDlls = Get-ChildItem 'tools/avrdude' -File -Filter '*.dll'
+          foreach ($Dll in $SourceDlls) {
+            if (!(Test-Path (Join-Path "$Internal/tools/avrdude" $Dll.Name))) {
+              throw "avrdude dependency DLL missing from package: $($Dll.Name)"
+            }
+          }
+
+      - name: Sign app executables when a trusted certificate is configured
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
+          WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERTIFICATE_BASE64) -or
+              [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERTIFICATE_PASSWORD)) {
+            'No publisher certificate configured; this candidate remains unsigned and may show SmartScreen.' | Add-Content $env:GITHUB_STEP_SUMMARY
+            Write-Warning 'Skipping Authenticode signing: configure the protected Windows signing secrets for signed releases.'
+            exit 0
+          }
+          $SdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits/10/bin'
+          $SignTool = Get-ChildItem $SdkRoot -Recurse -File -Filter 'signtool.exe' |
+            Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if (!$SignTool) { throw 'Windows SDK signtool.exe was not found.' }
+          $CertPath = Join-Path $env:RUNNER_TEMP 'publisher-codesign.pfx'
+          try {
+            [IO.File]::WriteAllBytes($CertPath, [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERTIFICATE_BASE64))
+            $Targets = @(
+              'dist/Arduino-PIC-Programmer/Arduino-PIC-Programmer.exe',
+              'dist/Arduino-PIC-Programmer/_internal/tools/ardpicprog.exe'
+            )
+            foreach ($Target in $Targets) {
+              & $SignTool.FullName sign /fd SHA256 /tr https://timestamp.digicert.com /td SHA256 `
+                /f $CertPath /p $env:WINDOWS_SIGNING_CERTIFICATE_PASSWORD /d 'Arduino-PIC Programmer' $Target
+              if ($LASTEXITCODE -ne 0) { throw "Authenticode signing failed for $Target." }
+              & $SignTool.FullName verify /pa /v $Target
+              if ($LASTEXITCODE -ne 0) { throw "Authenticode verification failed for $Target." }
+            }
+            'App binaries signed and timestamped with the configured publisher identity.' | Add-Content $env:GITHUB_STEP_SUMMARY
+          }
+          finally {
+            Remove-Item $CertPath -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Smoke-test packaged app startup without hardware
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $Exe = (Resolve-Path 'dist/Arduino-PIC-Programmer/Arduino-PIC-Programmer.exe').Path
+          $Process = Start-Process -FilePath $Exe -PassThru
+          try {
+            Start-Sleep -Seconds 8
+            $Process.Refresh()
+            if ($Process.HasExited) {
+              throw "Packaged application exited during startup with code $($Process.ExitCode)."
+            }
+            'Packaged application launched and stayed open without hardware.' | Add-Content $env:GITHUB_STEP_SUMMARY
+          }
+          finally {
+            $Process.Refresh()
+            if (!$Process.HasExited) { Stop-Process -Id $Process.Id -Force }
+          }
+
+      - name: Install WinApp CLI for UI Automation
+        shell: pwsh
+        run: |
+          winget install --id Microsoft.WinAppCli --exact --version 0.7.1 --source winget `
+            --silent --accept-source-agreements --accept-package-agreements
+          if ($LASTEXITCODE -ne 0) { throw 'Could not install the pinned WinApp CLI 0.7.1.' }
+          $WinGetLinks = Join-Path $env:LOCALAPPDATA 'Microsoft/WinGet/Links'
+          if (Test-Path $WinGetLinks) {
+            $WinGetLinks | Add-Content $env:GITHUB_PATH
+            $env:PATH = "$WinGetLinks;$env:PATH"
+          }
+          if (!(Get-Command winapp -ErrorAction SilentlyContinue)) {
+            throw 'WinApp CLI installed but winapp.exe is not on PATH.'
+          }
+          winapp --version
+
+      - name: Check packaged app accessibility with WinApp UI Automation
+        shell: pwsh
+        run: |
+          $Exe = (Resolve-Path 'dist/Arduino-PIC-Programmer/Arduino-PIC-Programmer.exe').Path
+          ./scripts/check_ui_accessibility.ps1 -ApplicationPath $Exe
+          if ($LASTEXITCODE -ne 0) { throw 'WinApp UI Automation check failed.' }
+          'WinApp UI Automation found the main workbench controls.' | Add-Content $env:GITHUB_STEP_SUMMARY
+
+      - name: Install Inno Setup compiler
+        shell: pwsh
+        run: |
+          $Compiler = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
+          if (!$Compiler) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Could not install Inno Setup.' }
+            $Candidates = @(
+              "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+              "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+            )
+            $CompilerPath = $Candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (!$CompilerPath) { throw 'Inno Setup compiler (ISCC.exe) was not found after installation.' }
+            'INNO_SETUP_COMPILER=' + $CompilerPath | Add-Content $env:GITHUB_ENV
+          }
+          else {
+            'INNO_SETUP_COMPILER=' + $Compiler.Source | Add-Content $env:GITHUB_ENV
+          }
+
+      - name: Build per-user installer
+        shell: pwsh
+        run: |
+          $CompilerOutput = & $env:INNO_SETUP_COMPILER 'packaging/installer.iss' 2>&1
+          $CompilerExitCode = $LASTEXITCODE
+          $CompilerOutput | ForEach-Object { Write-Output $_ }
+          if ($CompilerExitCode -ne 0) {
+            $Details = ($CompilerOutput | Out-String).Trim()
+            if ([string]::IsNullOrWhiteSpace($Details)) { $Details = 'ISCC.exe returned a non-zero exit code without diagnostic output.' }
+            throw "Inno Setup compilation failed (exit code $CompilerExitCode): $Details"
+          }
+          if (!(Test-Path 'dist/installer/Arduino-PIC-Programmer-Setup-x64.exe')) {
+            throw 'Installer output was not created.'
+          }
+
+      - name: Sign installer when a trusted certificate is configured
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
+          WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          $Installer = 'dist/installer/Arduino-PIC-Programmer-Setup-x64.exe'
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERTIFICATE_BASE64) -or
+              [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERTIFICATE_PASSWORD)) {
+            'Installer is unsigned; SmartScreen may warn until a trusted publisher signature/reputation is available.' | Add-Content $env:GITHUB_STEP_SUMMARY
+            Write-Warning 'No code-signing certificate configured; leaving the installer unsigned.'
+            exit 0
+          }
+          $SdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits/10/bin'
+          $SignTool = Get-ChildItem $SdkRoot -Recurse -File -Filter 'signtool.exe' |
+            Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if (!$SignTool) { throw 'Windows SDK signtool.exe was not found.' }
+          $CertPath = Join-Path $env:RUNNER_TEMP 'publisher-codesign.pfx'
+          try {
+            [IO.File]::WriteAllBytes($CertPath, [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERTIFICATE_BASE64))
+            & $SignTool.FullName sign /fd SHA256 /tr https://timestamp.digicert.com /td SHA256 `
+              /f $CertPath /p $env:WINDOWS_SIGNING_CERTIFICATE_PASSWORD /d 'Arduino-PIC Programmer' $Installer
+            if ($LASTEXITCODE -ne 0) { throw 'Installer Authenticode signing failed.' }
+            & $SignTool.FullName verify /pa /v $Installer
+            if ($LASTEXITCODE -ne 0) { throw 'Installer Authenticode verification failed.' }
+            'Installer signed and timestamped with the configured publisher identity.' | Add-Content $env:GITHUB_STEP_SUMMARY
+          }
+          finally {
+            Remove-Item $CertPath -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Install, launch, and uninstall installer smoke test
+        shell: pwsh
+        run: |
+          $Installer = (Resolve-Path 'dist/installer/Arduino-PIC-Programmer-Setup-x64.exe').Path
+          $InstallDir = Join-Path $env:RUNNER_TEMP 'ArduinoPICInstallerSmoke'
+          $Setup = Start-Process -FilePath $Installer -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$InstallDir"
+          ) -Wait -PassThru
+          if ($Setup.ExitCode -ne 0) { throw "Installer exited with code $($Setup.ExitCode)." }
+          $InstalledExe = Join-Path $InstallDir 'Arduino-PIC-Programmer.exe'
+          if (!(Test-Path $InstalledExe) -or !(Test-Path (Join-Path $InstallDir '_internal/tools/ardpicprog.exe'))) {
+            throw 'Installer did not place the application and host helper.'
+          }
+          $StartMenu = Join-Path $env:APPDATA 'Microsoft/Windows/Start Menu/Programs/Arduino-PIC Programmer.lnk'
+          if (!(Test-Path $StartMenu)) { throw 'Installer did not create the Start menu application shortcut.' }
+          $UninstallRoot = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
+          $InstalledEntry = Get-ChildItem $UninstallRoot -ErrorAction Stop |
+            ForEach-Object { Get-ItemProperty $_.PSPath } |
+            Where-Object { $_.DisplayName -eq 'Arduino-PIC Programmer' } |
+            Select-Object -First 1
+          if (!$InstalledEntry) { throw 'Installer did not register in Windows Installed Apps.' }
+          if ($InstalledEntry.DisplayVersion -ne '2.2.8' -or $InstalledEntry.DisplayIcon -notlike '*Arduino-PIC-Programmer.exe*') {
+            throw 'Installed Apps entry is missing the app version or branded app icon.'
+          }
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $App = Start-Process -FilePath $InstalledExe -PassThru
+          try {
+            Start-Sleep -Seconds 8
+            $App.Refresh()
+            if ($App.HasExited) { throw "Installed application exited during launch with code $($App.ExitCode)." }
+          }
+          finally {
+            $App.Refresh()
+            if (!$App.HasExited) { Stop-Process -Id $App.Id -Force }
+          }
+          $Uninstaller = Join-Path $InstallDir 'unins000.exe'
+          if (!(Test-Path $Uninstaller)) { throw 'Installer did not register an uninstaller.' }
+          $Removal = Start-Process -FilePath $Uninstaller -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
+          ) -Wait -PassThru
+          if ($Removal.ExitCode -ne 0) { throw "Uninstaller exited with code $($Removal.ExitCode)." }
+          if (Test-Path $InstalledExe) { throw 'Uninstaller left the application executable behind.' }
+          if (Test-Path $StartMenu) { throw 'Uninstaller left the Start menu shortcut behind.' }
+          $RemainingEntry = Get-ChildItem $UninstallRoot -ErrorAction SilentlyContinue |
+            ForEach-Object { Get-ItemProperty $_.PSPath } |
+            Where-Object { $_.DisplayName -eq 'Arduino-PIC Programmer' }
+          if ($RemainingEntry) { throw 'Uninstaller left the app registered in Windows Installed Apps.' }
+          'Per-user install, Start menu registration, no-hardware launch, and complete uninstall smoke test passed.' | Add-Content $env:GITHUB_STEP_SUMMARY
+
+      - name: Create installer-only ZIP and SHA-256 checksums
+        shell: pwsh
+        run: |
+          $SetupFile = 'dist/installer/Arduino-PIC-Programmer-Setup-x64.exe'
+          $Zip = 'dist/Arduino-PIC-Programmer-Installer-Windows-x64.zip'
+          $ZipOutput = & python -u packaging/create_installer_zip.py --installer $SetupFile --output $Zip 2>&1
+          $ZipExitCode = $LASTEXITCODE
+          $ZipOutput | ForEach-Object { Write-Output $_ }
+          if ($ZipExitCode -ne 0) {
+            $Details = (($ZipOutput | Out-String) -replace '\s+', ' ').Trim()
+            if ([string]::IsNullOrWhiteSpace($Details)) { $Details = 'Python returned a non-zero exit code without diagnostic output.' }
+            if ($Details.Length -gt 3000) { $Details = $Details.Substring(0, 3000) }
+            Write-Output "::error title=Installer ZIP diagnostics::$Details"
+            throw "Installer-only ZIP creation/validation failed (exit code $ZipExitCode): $Details"
+          }
+          $ZipHash = (Get-FileHash -Path $Zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$ZipHash  Arduino-PIC-Programmer-Installer-Windows-x64.zip" | Set-Content -Path "$Zip.sha256" -Encoding ascii
+          $ZipWrittenHash = ((Get-Content -Path "$Zip.sha256" -Raw).Trim() -split ' +')[0]
+          if ($ZipWrittenHash -ne $ZipHash) { throw 'Generated installer ZIP SHA-256 sidecar does not match the archive.' }
+          $SetupHash = (Get-FileHash -Path $SetupFile -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$SetupHash  Arduino-PIC-Programmer-Setup-x64.exe" | Set-Content -Path "$SetupFile.sha256" -Encoding ascii
+          $SetupWrittenHash = ((Get-Content -Path "$SetupFile.sha256" -Raw).Trim() -split ' +')[0]
+          if ($SetupWrittenHash -ne $SetupHash) { throw 'Generated installer SHA-256 sidecar does not match the installer.' }
+          Copy-Item -Path $SetupFile -Destination 'dist/Arduino-PIC-Programmer-Setup-x64.exe'
+          Copy-Item -Path "$SetupFile.sha256" -Destination 'dist/Arduino-PIC-Programmer-Setup-x64.exe.sha256'
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: Arduino-PIC-Programmer-Windows-x64-installer
+          path: |
+            dist/Arduino-PIC-Programmer-Setup-x64.exe
+            dist/Arduino-PIC-Programmer-Setup-x64.exe.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload installer-only ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          name: Arduino-PIC-Programmer-Installer-Windows-x64
+          path: |
+            dist/Arduino-PIC-Programmer-Installer-Windows-x64.zip
+            dist/Arduino-PIC-Programmer-Installer-Windows-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
